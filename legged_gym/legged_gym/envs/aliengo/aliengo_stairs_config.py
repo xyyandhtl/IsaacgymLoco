@@ -62,7 +62,6 @@ class AlienGoStairsCfg(LeggedRobotCfg):
             'RR_calf_joint': -1.5,  # [rad]
         }
 
-
     class terrain(LeggedRobotCfg.terrain):
         mesh_type = 'trimesh'  # "heightfield" # none, plane, heightfield or trimesh
         horizontal_scale = 0.1  # [m]
@@ -105,10 +104,11 @@ class AlienGoStairsCfg(LeggedRobotCfg):
         num_commands = 4 # default: lin_vel_x, lin_vel_y, ang_vel_yaw, heading (in heading mode ang_vel_yaw is recomputed from heading error)
         resampling_time = 10. # time before command are changed[s]
         heading_command = True # if true: compute ang vel command from heading error
+
         class ranges( LeggedRobotCfg.commands.ranges):
-            lin_vel_x = [-1.0, 1.0] # min max [m/s]
-            lin_vel_y = [-0.5, 0.5]   # min max [m/s]
-            ang_vel_yaw = [-1, 1]    # min max [rad/s]
+            lin_vel_x = [-1.0, 1.0]  # min max [m/s]
+            lin_vel_y = [-0.5, 0.5]  # min max [m/s]
+            ang_vel_yaw = [-1, 1]  # min max [rad/s]
             heading = [-1, 1]
 
     class asset(LeggedRobotCfg.asset):
@@ -120,6 +120,44 @@ class AlienGoStairsCfg(LeggedRobotCfg):
         privileged_contacts_on = ["base", "thigh", "calf"]
         self_collisions = 1  # 1 to disable, 0 to enable...bitwise filter
         flip_visual_attachments = True  # Some .obj meshes must be flipped from y-up to z-up
+
+    class domain_rand:
+        randomize_payload_mass = True
+        payload_mass_range = [-1, 2]
+
+        randomize_com_displacement = True
+        com_displacement_range = [-0.05, 0.05]
+
+        randomize_link_mass = False
+        link_mass_range = [0.9, 1.1]
+
+        randomize_friction = True
+        friction_range = [0.2, 1.25]
+
+        randomize_restitution = False
+        restitution_range = [0., 1.0]
+
+        randomize_motor_strength = True
+        motor_strength_range = [0.9, 1.1]
+
+        randomize_kp = True
+        kp_range = [0.9, 1.1]
+
+        randomize_kd = True
+        kd_range = [0.9, 1.1]
+
+        randomize_initial_joint_pos = True
+        initial_joint_pos_range = [0.5, 1.5]
+
+        disturbance = True
+        disturbance_range = [-30.0, 30.0]
+        disturbance_interval = 8
+
+        push_robots = True
+        push_interval_s = 16
+        max_push_vel_xy = 1.
+
+        delay = True
 
     class rewards(LeggedRobotCfg.rewards):
         class scales:
@@ -151,20 +189,75 @@ class AlienGoStairsCfg(LeggedRobotCfg):
         soft_dof_pos_limit = 0.95  # percentage of urdf limits, values above this limit are penalized
         soft_dof_vel_limit = 0.95
         soft_torque_limit = 0.95
-        base_height_target = 0.40
+        base_height_target = 0.45
         max_contact_force = 100.  # forces above this value are penalized
         clearance_height_target = -0.20
 
+    class normalization:
+        class obs_scales:
+            lin_vel = 2.0
+            ang_vel = 0.25
+            dof_pos = 1.0
+            dof_vel = 0.05
+            height_measurements = 5.0
+        clip_observations = 100.
+        clip_actions = 100.
+
+    class noise:
+        add_noise = True
+        noise_level = 1.0 # scales other values
+        class noise_scales:
+            dof_pos = 0.01
+            dof_vel = 1.5
+            lin_vel = 0.1
+            ang_vel = 0.2
+            gravity = 0.05
+            height_measurements = 0.1
+
+
 logs_root = osp.join(osp.dirname(osp.dirname(osp.dirname(osp.dirname(osp.abspath(__file__))))), "logs")
 class AlienGoStairsCfgPPO(LeggedRobotCfgPPO):
+    seed = 1
+    runner_class_name = 'HIMOnPolicyRunner'
+
+    class policy:
+        init_noise_std = 1.0
+        actor_hidden_dims = [512, 256, 128]
+        critic_hidden_dims = [512, 256, 128]
+        activation = 'elu'  # can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
+        # only for 'ActorCriticRecurrent':
+        # rnn_type = 'lstm'
+        # rnn_hidden_size = 512
+        # rnn_num_layers = 1
+
     class algorithm(LeggedRobotCfgPPO.algorithm):
         entropy_coef = 0.01
 
+        # training params
+        value_loss_coef = 1.0
+        use_clipped_value_loss = True
+        clip_param = 0.2
+        entropy_coef = 0.01
+        num_learning_epochs = 5
+        num_mini_batches = 4  # mini batch size = num_envs*nsteps / nminibatches
+        learning_rate = 1.e-3  # 5.e-4
+        schedule = 'adaptive'  # could be adaptive, fixed
+        gamma = 0.99
+        lam = 0.95
+        desired_kl = 0.01
+        max_grad_norm = 1.
+
     class runner(LeggedRobotCfgPPO.runner):
-        run_name = ''
+        policy_class_name = 'HIMActorCritic'
+        algorithm_class_name = 'HIMPPO'
+        num_steps_per_env = 100  # per iteration
+        max_iterations = 3000  # number of policy updates
+
+        # logging
+        save_interval = 200  # check for potential saves every this many iterations
         experiment_name = 'stairs_aliengo'
+        run_name = ''
+        # load and resume
         resume = True
         load_run = osp.join(logs_root, 'rough_aliengo', 'May26_15-08-38_')
-
-        max_iterations = 6000
-        save_interval = 200
+        checkpoint = -1  # -1 = last saved model

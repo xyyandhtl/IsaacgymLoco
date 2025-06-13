@@ -48,8 +48,8 @@ class AlienGoRoughCfg(LeggedRobotCfg):
             # 髋关节
             'FL_hip_joint': 0.0,   # [rad]
             'RL_hip_joint': 0.0,   # [rad]
-            'FR_hip_joint': 0.0,   # [rad]
-            'RR_hip_joint': 0.0,   # [rad]
+            'FR_hip_joint': -0.0,   # [rad]
+            'RR_hip_joint': -0.0,   # [rad]
             # 大腿关节
             'FL_thigh_joint': 0.8,   # [rad]
             'RL_thigh_joint': 0.8,   # [rad]
@@ -115,8 +115,60 @@ class AlienGoRoughCfg(LeggedRobotCfg):
         penalize_contacts_on = ["thigh", "calf", "base"]    # 非足部区域（这里为大腿、小腿）接触地面，则触发惩罚
         terminate_after_contacts_on = ["base"]      # （机身）接触地面，则触发终止训练
         privileged_contacts_on = ["base", "thigh", "calf"]  # 特权接触检测区域
-        self_collisions = 1     # 1：禁用自身各部分之间的碰撞检测（提升性能）；0：启用
+        self_collisions = 1  # 1：禁用自身各部分之间的碰撞检测（提升性能）；0：启用
         flip_visual_attachments = True  # 翻转视觉模型坐标系（Y-up转Z-up），许多 .obj meshes 必须从 y-up 转到 z-up
+
+        disable_gravity = False
+        collapse_fixed_joints = True  # merge bodies connected by fixed joints. Specific fixed joints can be kept by adding " <... dont_collapse="true">
+        fix_base_link = False  # fixe the base of the robot
+        default_dof_drive_mode = 3  # see GymDofDriveModeFlags (0 is none, 1 is pos tgt, 2 is vel tgt, 3 effort)
+        replace_cylinder_with_capsule = True  # replace collision cylinders with capsules, leads to faster/more stable simulation
+
+        density = 0.001
+        angular_damping = 0.
+        linear_damping = 0.
+        max_angular_velocity = 1000.
+        max_linear_velocity = 1000.
+        armature = 0.
+        thickness = 0.01
+
+    class domain_rand:
+        randomize_payload_mass = True
+        payload_mass_range = [-1, 2]
+
+        randomize_com_displacement = True
+        com_displacement_range = [-0.05, 0.05]
+
+        randomize_link_mass = False
+        link_mass_range = [0.9, 1.1]
+
+        randomize_friction = True
+        friction_range = [0.2, 1.25]
+
+        randomize_restitution = False
+        restitution_range = [0., 1.0]
+
+        randomize_motor_strength = True
+        motor_strength_range = [0.9, 1.1]
+
+        randomize_kp = True
+        kp_range = [0.9, 1.1]
+
+        randomize_kd = True
+        kd_range = [0.9, 1.1]
+
+        randomize_initial_joint_pos = True
+        initial_joint_pos_range = [0.5, 1.5]
+
+        disturbance = True
+        disturbance_range = [-30.0, 30.0]
+        disturbance_interval = 8
+
+        push_robots = True
+        push_interval_s = 16
+        max_push_vel_xy = 1.
+
+        delay = True
 
     class rewards(LeggedRobotCfg.rewards):
         class scales:
@@ -147,17 +199,74 @@ class AlienGoRoughCfg(LeggedRobotCfg):
         soft_dof_pos_limit = 0.95   # 关节位置软限位：关节角度超过URDF限位95%时触发惩罚。调低（如0.9）可提前约束
         soft_dof_vel_limit = 0.95   # 关节速度软限位：超过最大速度95%时惩罚。保护电机模型不过载
         soft_torque_limit = 0.95    # 关节力矩软限位：超过额定扭矩95%时惩罚。防止仿真数值发散
-        base_height_target = 0.4   # 机身目标高度（低于初始高度0.55m）
+        base_height_target = 0.45   # 机身目标高度（低于初始高度0.55m）
         max_contact_force = 100.    # forces above this value are penalized
         clearance_height_target = -0.20 # 足部离地高度目标：负值表示允许触地。调为正值可强制抬腿（如0.05m）
 
+    class normalization:
+        class obs_scales:
+            lin_vel = 2.0
+            ang_vel = 0.25
+            dof_pos = 1.0
+            dof_vel = 0.05
+            height_measurements = 5.0
+        clip_observations = 100.
+        clip_actions = 100.
+
+    class noise:
+        add_noise = True
+        noise_level = 1.0 # scales other values
+        class noise_scales:
+            dof_pos = 0.01
+            dof_vel = 1.5
+            lin_vel = 0.1
+            ang_vel = 0.2
+            gravity = 0.05
+            height_measurements = 0.1
+
 
 class AlienGoRoughCfgPPO( LeggedRobotCfgPPO ):
+    seed = 1
+    runner_class_name = 'HIMOnPolicyRunner'
+
+    class policy:
+        init_noise_std = 1.0
+        actor_hidden_dims = [512, 256, 128]
+        critic_hidden_dims = [512, 256, 128]
+        activation = 'elu'  # can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
+        # only for 'ActorCriticRecurrent':
+        # rnn_type = 'lstm'
+        # rnn_hidden_size = 512
+        # rnn_num_layers = 1
+
     class algorithm( LeggedRobotCfgPPO.algorithm ):
         entropy_coef = 0.01  # 熵系数（鼓励探索）
-    class runner( LeggedRobotCfgPPO.runner ):
-        run_name = ''
-        experiment_name = 'rough_aliengo'
 
-        max_iterations = 1000
-        save_interval = 100
+        # training params
+        value_loss_coef = 1.0
+        use_clipped_value_loss = True
+        clip_param = 0.2
+        entropy_coef = 0.01
+        num_learning_epochs = 5
+        num_mini_batches = 4  # mini batch size = num_envs*nsteps / nminibatches
+        learning_rate = 1.e-3  # 5.e-4
+        schedule = 'adaptive'  # could be adaptive, fixed
+        gamma = 0.99
+        lam = 0.95
+        desired_kl = 0.01
+        max_grad_norm = 1.
+
+    class runner( LeggedRobotCfgPPO.runner ):
+        policy_class_name = 'HIMActorCritic'
+        algorithm_class_name = 'HIMPPO'
+        num_steps_per_env = 100  # per iteration
+        max_iterations = 1000  # number of policy updates
+
+        # logging
+        save_interval = 100  # check for potential saves every this many iterations
+        experiment_name = 'rough_aliengo'
+        run_name = ''
+        # load and resume
+        resume = False
+        load_run = -1  # -1 = last run
+        checkpoint = -1  # -1 = last saved model
