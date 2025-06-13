@@ -31,7 +31,7 @@
 import numpy as np
 from numpy.random import choice
 from scipy import interpolate
-
+import random
 from isaacgym import terrain_utils
 from legged_gym.envs.base.legged_robot_config import LeggedRobotCfg
 
@@ -43,15 +43,15 @@ class Terrain:
         self.type = cfg.mesh_type
         if self.type in ["none", 'plane']:
             return
-        self.env_length = cfg.terrain_length
-        self.env_width = cfg.terrain_width
-        self.proportions = [np.sum(cfg.terrain_proportions[:i+1]) for i in range(len(cfg.terrain_proportions))]
+        self.env_length = cfg.terrain_length  # 8
+        self.env_width = cfg.terrain_width  # 8
+        self.proportions = [np.sum(cfg.terrain_proportions[:i + 1]) for i in range(len(cfg.terrain_proportions))]
 
         self.cfg.num_sub_terrains = cfg.num_rows * cfg.num_cols
         self.env_origins = np.zeros((cfg.num_rows, cfg.num_cols, 3))
 
-        self.width_per_env_pixels = int(self.env_width / cfg.horizontal_scale)
-        self.length_per_env_pixels = int(self.env_length / cfg.horizontal_scale)
+        self.width_per_env_pixels = int(self.env_width / cfg.horizontal_scale)  # 8 / 0.1 = 80
+        self.length_per_env_pixels = int(self.env_length / cfg.horizontal_scale)  # 8 / 0.1 = 80
 
         self.border = int(cfg.border_size/self.cfg.horizontal_scale)
         self.tot_cols = int(cfg.num_cols * self.width_per_env_pixels) + 2 * self.border
@@ -83,10 +83,10 @@ class Terrain:
             self.add_terrain_to_map(terrain, i, j)
         
     def curiculum(self):
-        for j in range(self.cfg.num_cols):
-            for i in range(self.cfg.num_rows):
-                difficulty = i / self.cfg.num_rows
-                choice = j / self.cfg.num_cols + 0.001
+        for j in range(self.cfg.num_cols):  # [0, 20]
+            for i in range(self.cfg.num_rows):  # [0, 10]
+                difficulty = i / self.cfg.num_rows  # [0.0, 0.1, ..., 0.9]
+                choice = j / self.cfg.num_cols + 0.001  # [0.0+0.001, 0.05+0.001, ..., 0.95+0.001]
 
                 terrain = self.make_terrain(choice, difficulty)
                 self.add_terrain_to_map(terrain, i, j)
@@ -107,41 +107,79 @@ class Terrain:
             self.add_terrain_to_map(terrain, i, j)
     
     def make_terrain(self, choice, difficulty):
+        """
+            choice: [0.0+0.001, 0.05+0.001, ..., 0.95+0.001]
+            difficulty: [0.0, 0.1, ..., 0.9]
+        """
         terrain = terrain_utils.SubTerrain(   "terrain",
-                                width=self.width_per_env_pixels,
+                                width=self.width_per_env_pixels,  # 80
                                 length=self.width_per_env_pixels,
-                                vertical_scale=self.cfg.vertical_scale,
-                                horizontal_scale=self.cfg.horizontal_scale)
+                                vertical_scale=self.cfg.vertical_scale,  # 0.005
+                                horizontal_scale=self.cfg.horizontal_scale)  # 0.1
         slope = difficulty * 0.4
         amplitude = 0.01 + 0.07 * difficulty
-        step_height = 0.05 + 0.18 * difficulty
+        # step_height = 0.05 + 0.18 * difficulty  # 0.05 + [0.0, 0.018, ..., 0.162]
+        step_height = min(0.1 + 0.12 * difficulty, 0.18)  # 0.1 + [0.0, 0.012, ..., 0.06, ..., 0.108]
+        # step_height = 0.05 + 0.2 * difficulty  # 0.05 + [0.0, 0.02, ..., 0.1, ..., 0.18]
         discrete_obstacles_height = 0.05 + difficulty * 0.1
         stepping_stones_size = 1.5 * (1.05 - difficulty)
         stone_distance = 0.05 if difficulty==0 else 0.1
         gap_size = 1. * difficulty
-        pit_depth = 1. * difficulty
-        if choice < self.proportions[0]:
-            if choice < self.proportions[0]/ 2:
+        pit_depth = min(0.5 * difficulty, 0.35)
+
+        num_rectangles = 20
+        rectangle_min_size = 1.
+        rectangle_max_size = 2.
+        #
+        # length = int(terrain.height_field_raw.shape[1] * 0.3)
+        # terrain.height_field_raw[:, :length] = 250
+        # terrain.height_feld_raw[:, -length:] = 250
+        #
+        # if random.random() > min(0.8, 0.2 + 0.5*difficulty):
+        #     obstacle_width = int(terrain.height_field_raw.shape[1] * (0.3 + random.random() * 0.15))
+        #     obstacle_length = int(terrain.height_field_raw.shape[0] * random.random() * 0.5)
+        #     start = int(terrain.height_field_raw.shape[0] * random.random() * 0.6)
+        #     if random.random() > 0.5:
+        #         terrain.height_field_raw[start:start + obstacle_length, :obstacle_width] = 250
+        #     else:
+        #         terrain.height_field_raw[start:start + obstacle_length, -obstacle_width:] = 250
+        #
+        #
+        # for i in range(2):
+        #     pit_width = random.choice([2,3,4,5])
+        #     start_x = min(int(terrain.height_field_raw.shape[0] * random.random() * 0.6), terrain.height_field_raw.shape[0] - 5)
+        #     start_y = int(terrain.height_field_raw.shape[1] * 0.3) + \
+        #               min(int(terrain.height_field_raw.shape[1] * random.random() * 0.4),terrain.height_field_raw.shape[1] - 5)
+        #
+        #     if random.random() > 0.5:
+        #         terrain.height_field_raw[start_x:start_x + pit_width, start_y:start_y + pit_width] = 3 + 2 * random.random()
+        #     else:
+        #         terrain.height_field_raw[start_x:start_x + pit_width, start_y:start_y + pit_width] = -0.5 - 1 * random.random()
+
+        if choice < self.proportions[0]:  # 斜坡地形
+            if choice < self.proportions[0] / 2:  # 斜坡地形中的前一半列，上斜坡
                 slope *= -1
+            # 后一半列，下斜坡
             terrain_utils.pyramid_sloped_terrain(terrain, slope=slope, platform_size=3.)
-        elif choice < self.proportions[1]:
+        elif choice < self.proportions[1]:  # 斜坡+随机起伏地形
             terrain_utils.pyramid_sloped_terrain(terrain, slope=slope, platform_size=3.)
             terrain_utils.random_uniform_terrain(terrain, min_height=-amplitude, max_height=amplitude, step=0.005, downsampled_scale=0.2)
-        elif choice < self.proportions[3]:
-            if choice<self.proportions[2]:
+        elif choice < self.proportions[3]:  # 台阶地形
+            if choice<self.proportions[2]:  # 台阶地形中的前一半列，先上台阶
                 step_height *= -1
-            terrain_utils.pyramid_stairs_terrain(terrain, step_width=0.30, step_height=step_height, platform_size=3.)
-        elif choice < self.proportions[4]:
+            # 台阶地形中的后一半列，先下台阶
+            pyramid_stairs_terrain(terrain, step_width=0.30, step_height=step_height, platform_size=3., border_width=1.)
+        elif choice < self.proportions[4]:  # 离散障碍物
             num_rectangles = 20
             rectangle_min_size = 1.
             rectangle_max_size = 2.
             terrain_utils.discrete_obstacles_terrain(terrain, discrete_obstacles_height, rectangle_min_size, rectangle_max_size, num_rectangles, platform_size=3.)
-        elif choice < self.proportions[5]:
-            terrain_utils.stepping_stones_terrain(terrain, stone_size=stepping_stones_size, stone_distance=stone_distance, max_height=0., platform_size=4.)
-        elif choice < self.proportions[6]:
-            gap_terrain(terrain, gap_size=gap_size, platform_size=3.)
-        else:
+        elif choice < self.proportions[5]:  # 跳跃石地形
+            terrain_utils.stepping_stones_terrain(terrain, stone_size=stepping_stones_size, stone_distance=stone_distance, max_height=0.8, platform_size=4.)
+        elif choice < self.proportions[6]:  # 坑洞地形
             pit_terrain(terrain, depth=pit_depth, platform_size=4.)
+        else:  # 间隙地形
+            gap_terrain(terrain, gap_size=gap_size, platform_size=3.)
         
         return terrain
 
@@ -186,3 +224,43 @@ def pit_terrain(terrain, depth, platform_size=1.):
     y1 = terrain.width // 2 - platform_size
     y2 = terrain.width // 2 + platform_size
     terrain.height_field_raw[x1:x2, y1:y2] = -depth
+
+
+def pyramid_stairs_terrain(terrain, step_width, step_height, platform_size=1., border_width=0.):
+    """
+    Generate stairs
+
+    Parameters:
+        terrain (terrain): the terrain
+        step_width (float):  the width of the step [meters]
+        step_height (float): the step_height [meters]
+        platform_size (float): size of the flat platform at the center of the terrain [meters]
+        border_width (float): 地形周围平地的宽度 [meters]
+    Returns:
+        terrain (SubTerrain): update terrain
+    """
+    # print(f"[terrain | step_width] {step_width} / {terrain.horizontal_scale} =  {int(step_width / terrain.horizontal_scale)}")
+    step_width = int(step_width / terrain.horizontal_scale)
+    step_height = int(step_height / terrain.vertical_scale)
+    platform_size = int(platform_size / terrain.horizontal_scale)
+    border_width = int(border_width / terrain.horizontal_scale)
+
+    height = 0
+    start_x = border_width
+    stop_x = terrain.width - border_width
+    start_y = border_width
+    stop_y = terrain.length - border_width
+    while (stop_x - start_x) > platform_size and (stop_y - start_y) > platform_size:
+        start_x += step_width
+        stop_x -= step_width
+        start_y += step_width
+        stop_y -= step_width
+        height += step_height
+        terrain.height_field_raw[start_x:stop_x, start_y:stop_y] = height
+
+    terrain.height_field_raw[0:border_width, :] = 0
+    terrain.height_field_raw[-border_width:, :] = 0
+    terrain.height_field_raw[:, 0:border_width] = 0
+    terrain.height_field_raw[:, -border_width:] = 0
+
+    return terrain
