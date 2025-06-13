@@ -80,11 +80,10 @@ class AlienGoRoughCfg(LeggedRobotCfg):
         max_init_terrain_level = 5 # starting curriculum state
         terrain_length = 8.
         terrain_width = 8.
-        num_rows= 10 # number of terrain rows (levels)
+        num_rows = 10 # number of terrain rows (levels)
         num_cols = 20 # number of terrain cols (types)
-        # terrain types: [smooth slope, rough slope, stairs up, stairs down, discrete obstacles, stepping_stones, pit, gap]
-        terrain_proportions = [0.5, 0.5]  # 第一阶段
-        # terrain_proportions = [0.1, 0.1, 0.4, 0.4]  # 第二阶段
+        # terrain types: [flat, rough, smooth_slope, rough_slope, stairs_up, stairs_down, discrete_obstacles, stepping_stones, pit, gap]
+        terrain_proportions = [0.5, 0.5]
         # trimesh only:
         slope_treshold = 0.75 # slopes above this threshold will be corrected to vertical surfaces
 

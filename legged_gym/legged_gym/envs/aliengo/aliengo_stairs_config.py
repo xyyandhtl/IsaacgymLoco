@@ -83,9 +83,8 @@ class AlienGoStairsCfg(LeggedRobotCfg):
         terrain_width = 10.
         num_rows = 10  # number of terrain rows (levels)
         num_cols = 20  # number of terrain cols (types)
-        # terrain types: [smooth slope, rough slope, stairs up, stairs down, discrete obstacles, stepping_stones, pit, gap]
-        # terrain_proportions = [0.1, 0.1, 0.5, 0.2, 0.0, 0.0, 0.1]  # 第二阶段
-        terrain_proportions = [0.1, 0.0, 0.6, 0.3, 0.0, 0.0, 0.0]  # 第二阶段
+        # terrain types: [flat, rough, smooth_slope, rough_slope, stairs_up, stairs_down, discrete_obstacles, stepping_stones, pit, gap]
+        terrain_proportions = [0.0, 0.1, 0.1, 0.0, 0.5, 0.3, 0.0, 0.0, 0.0, 0.0]
         # trimesh only:
         slope_treshold = 0.75  # slopes above this threshold will be corrected to vertical surfaces
 
