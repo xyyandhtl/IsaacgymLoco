@@ -73,56 +73,81 @@ class Normalization:
 
 class HIMActorCritic(nn.Module):
     is_recurrent = False
-    def __init__(self,  num_actor_obs,
-                        num_critic_obs,
-                        num_one_step_obs,
-                        num_actions,
-                        actor_hidden_dims=[512, 256, 128],
-                        critic_hidden_dims=[512, 256, 128],
-                        activation='elu',
-                        init_noise_std=1.0,
-                        **kwargs):
+    def __init__(self, num_actor_obs,  # 45 * 6
+                 num_critic_obs,  # 45 * 6
+                 num_one_step_obs,  # 45
+                 num_actions,  # 12
+                 actor_hidden_dims=[512, 256, 128],
+                 critic_hidden_dims=[512, 256, 128],
+                 visual_critic_hidden_dims=[256, 128],
+                 activation='elu',
+                 init_noise_std=1.0,
+                 **kwargs):
         if kwargs:
-            print("ActorCritic.__init__ got unexpected arguments, which will be ignored: " + str([key for key in kwargs.keys()]))
+            print("ActorCritic.__init__ got unexpected arguments, which will be ignored: " + str(
+                [key for key in kwargs.keys()]))
         super(HIMActorCritic, self).__init__()
 
         activation = get_activation(activation)
 
-        self.history_size = int(num_actor_obs/num_one_step_obs)
+        self.history_size = int(num_actor_obs / num_one_step_obs)
         self.num_actor_obs = num_actor_obs
         self.num_actions = num_actions
         self.num_one_step_obs = num_one_step_obs
+        #self.num_one_step_camera_obsnum_one_step_camera_obs = num_one_step_camera_obs
 
-        mlp_input_dim_a = num_one_step_obs + 3 + 16
+        mlp_input_dim_a = num_one_step_obs + 3 + 16  # + self.camera_embed_len
         mlp_input_dim_c = num_critic_obs
 
         # Estimator
         self.estimator = HIMEstimator(temporal_steps=self.history_size, num_one_step_obs=num_one_step_obs)
 
+        # image encoder
+        encoder_layers = [nn.Linear(87 * 58 * 6, 128)]
+        encoder_layers.append(activation)
+        encoder_layers.append(nn.Linear(128, 128))
+        encoder_layers.append(activation)
+        encoder_layers.append(nn.Linear(128, 3))
+        encoder_layers.append(activation)
+        self.encoder = nn.Sequential(*encoder_layers)
+
         # Policy
         actor_layers = []
         actor_layers.append(nn.Linear(mlp_input_dim_a, actor_hidden_dims[0]))
         actor_layers.append(activation)
-        for l in range(len(actor_hidden_dims)):
-            if l == len(actor_hidden_dims) - 1:
-                actor_layers.append(nn.Linear(actor_hidden_dims[l], num_actions))
-                # actor_layers.append(nn.Tanh())
-            else:
-                actor_layers.append(nn.Linear(actor_hidden_dims[l], actor_hidden_dims[l + 1]))
-                actor_layers.append(activation)
+        for l in range(len(actor_hidden_dims) - 1):
+            actor_layers.append(nn.Linear(actor_hidden_dims[l], actor_hidden_dims[l + 1]))
+            actor_layers.append(activation)
         self.actor = nn.Sequential(*actor_layers)
+        self.actor_final_layer = nn.Linear(actor_hidden_dims[-1], num_actions)
 
         # Value function
         critic_layers = []
         critic_layers.append(nn.Linear(mlp_input_dim_c, critic_hidden_dims[0]))
         critic_layers.append(activation)
-        for l in range(len(critic_hidden_dims)):
-            if l == len(critic_hidden_dims) - 1:
-                critic_layers.append(nn.Linear(critic_hidden_dims[l], 1))
-            else:
-                critic_layers.append(nn.Linear(critic_hidden_dims[l], critic_hidden_dims[l + 1]))
-                critic_layers.append(activation)
+        for l in range(len(critic_hidden_dims) - 1):
+            critic_layers.append(nn.Linear(critic_hidden_dims[l], critic_hidden_dims[l + 1]))
+            critic_layers.append(activation)
         self.critic = nn.Sequential(*critic_layers)
+        self.critic_final_layer = nn.Linear(critic_hidden_dims[-1], 1)
+
+        visual_critic_layers = []
+        visual_critic_layers.append(nn.Linear(mlp_input_dim_c, critic_hidden_dims[0]))
+        visual_critic_layers.append(activation)
+        for l in range(len(critic_hidden_dims) - 1):
+            visual_critic_layers.append(nn.Linear(critic_hidden_dims[l], critic_hidden_dims[l + 1]))
+            visual_critic_layers.append(activation)
+        self.visual_critic = nn.Sequential(*critic_layers)
+        self.image_embed_len = 128
+        visual_encoder_layers = [nn.Linear(87 * 58 * 6, 128)]
+        visual_encoder_layers.append(activation)
+        visual_encoder_layers.append(nn.Linear(128,  self.image_embed_len))
+        self.visual_encoder = nn.Sequential(*visual_encoder_layers)
+        visual_critic_final_layer = []
+        visual_critic_final_layer.append(nn.Linear(critic_hidden_dims[-1] + self.image_embed_len, 128))
+        visual_critic_final_layer.append(activation)
+        visual_critic_final_layer.append(nn.Linear(128, 1))
+        self.visual_critic_final_layer = nn.Sequential(*visual_critic_final_layer)
 
         print(f"Actor MLP: {self.actor}")
         print(f"Critic MLP: {self.critic}")
@@ -163,25 +188,40 @@ class HIMActorCritic(nn.Module):
     def entropy(self):
         return self.distribution.entropy().sum(dim=-1)
 
-    def update_distribution(self, obs_history):
+    def update_distribution(self, obs_history, camera_obs_history=None):
         with torch.no_grad():
             vel, latent = self.estimator(obs_history)
-        actor_input = torch.cat((obs_history[:,:self.num_one_step_obs], vel, latent), dim=-1)
-        mean = self.actor(actor_input)
-        self.distribution = Normal(mean, mean*0. + self.std)
+        actor_input = torch.cat((obs_history[:, :self.num_one_step_obs], vel, latent), dim=-1)
+        actor_embed = self.actor(actor_input)
+        mean = self.actor_final_layer(actor_embed)
+        self.distribution = Normal(mean, mean * 0. + self.std)
 
-    def act(self, obs_history=None, **kwargs):
-        self.update_distribution(obs_history)
+    def act(self, obs_history=None, camera_obs_history=None, **kwargs):
+        self.update_distribution(obs_history, camera_obs_history)
         return self.distribution.sample()
     
     def get_actions_log_prob(self, actions):
         return self.distribution.log_prob(actions).sum(dim=-1)
 
-    def act_inference(self, obs_history, observations=None):
+    def act_inference(self, obs_history, camera_obs_history=None, observations=None):
         vel, latent = self.estimator(obs_history)
-        actions_mean = self.actor(torch.cat((obs_history[:,:self.num_one_step_obs], vel, latent), dim=-1))
-        return actions_mean
+        # camera_embed = self.encoder(camera_obs_history[:, :self.num_one_step_camera_obs])
+        # camera_embed = camera_obs_history[:, :self.num_one_step_camera_obs]
+        actor_input = torch.cat((obs_history[:, :self.num_one_step_obs], vel, latent), dim=-1)
+        actor_embed = self.actor(actor_input)
+        mean = self.actor_final_layer(actor_embed)
+        return mean
 
     def evaluate(self, critic_observations, **kwargs):
-        value = self.critic(critic_observations)
+        # camera_embed = self.encoder(camera_observations)
+        value_embed = self.critic(critic_observations)
+        # value_embed = torch.cat((value_embed, camera_embed), dim=-1)
+        value = self.critic_final_layer(value_embed)
+        return value
+
+    def visual_evaluate(self, critic_observations, camera_obs_history, **kwargs):
+        image_embed = self.visual_encoder(camera_obs_history)
+        value_embed = self.critic(critic_observations)
+        value_embed = torch.cat((value_embed, image_embed), dim=-1)
+        value = self.visual_critic_final_layer(value_embed)
         return value
