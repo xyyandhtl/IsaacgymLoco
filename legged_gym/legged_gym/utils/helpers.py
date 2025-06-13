@@ -102,16 +102,18 @@ def parse_sim_params(args, cfg):
     return sim_params
 
 def get_load_path(root, load_run=-1, checkpoint=-1):
-    try:
-        runs = os.listdir(root)
-        #TODO sort by date to handle change of month
-        runs.sort()
-        if 'exported' in runs: runs.remove('exported')
-        last_run = os.path.join(root, runs[-1])
-    except:
-        raise ValueError("No runs in this directory: " + root)
     if load_run==-1:
+        try:
+            runs = os.listdir(root)
+            #TODO sort by date to handle change of month
+            runs.sort()
+            if 'exported' in runs: runs.remove('exported')
+            last_run = os.path.join(root, runs[-1])
+        except:
+            raise ValueError("No runs in this directory: " + root)
         load_run = last_run
+    elif os.path.isabs(load_run):
+        print("Loading load_run as absolute path:", load_run)
     else:
         load_run = os.path.join(root, load_run)
 
@@ -190,6 +192,7 @@ def export_policy_as_jit(actor_critic, path):
         path = os.path.join(path, 'policy_1.pt')
         model = copy.deepcopy(actor_critic.actor).to('cpu')
         traced_script_module = torch.jit.script(model)
+        print("jit path:", path)
         traced_script_module.save(path)
 
 # class PolicyExporterLSTM(torch.nn.Module):

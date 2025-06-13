@@ -62,16 +62,54 @@ class AlienGoRoughCfg(LeggedRobotCfg):
             'RR_calf_joint': -1.5,   # [rad]
         }
 
-    class control(LeggedRobotCfg.control):
+    class terrain( LeggedRobotCfg.terrain ):
+        mesh_type = 'trimesh' # "heightfield" # none, plane, heightfield or trimesh
+        horizontal_scale = 0.1 # [m]
+        vertical_scale = 0.005 # [m]
+        border_size = 15 # [m]
+        curriculum = True
+        static_friction = 1.0
+        dynamic_friction = 1.0
+        restitution = 0.
+        # rough terrain only:
+        measure_heights = True
+        measured_points_x = [-0.8, -0.7, -0.6, -0.5, -0.4, -0.3, -0.2, -0.1, 0., 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8] # 1mx1.6m rectangle (without center line)
+        measured_points_y = [-0.5, -0.4, -0.3, -0.2, -0.1, 0., 0.1, 0.2, 0.3, 0.4, 0.5]
+        selected = False # select a unique terrain type and pass all arguments
+        terrain_kwargs = None # Dict of arguments for selected terrain
+        max_init_terrain_level = 5 # starting curriculum state
+        terrain_length = 8.
+        terrain_width = 8.
+        num_rows= 10 # number of terrain rows (levels)
+        num_cols = 20 # number of terrain cols (types)
+        # terrain types: [smooth slope, rough slope, stairs up, stairs down, discrete obstacles, stepping_stones, pit, gap]
+        terrain_proportions = [0.5, 0.5]  # 第一阶段
+        # terrain_proportions = [0.1, 0.1, 0.4, 0.4]  # 第二阶段
+        # trimesh only:
+        slope_treshold = 0.75 # slopes above this threshold will be corrected to vertical surfaces
+
+    class control( LeggedRobotCfg.control ):
         # PD Drive parameters:
         control_type = 'P'  # 控制类型（P=位置控制，T=力矩控制）
         stiffness = {'joint': 40.0} # 关节刚度（单位：N·m/rad）
         damping = {'joint': 2.0}    # 关节阻尼（单位：N·m·s/rad）
         action_scale = 0.5  # 动作缩放因子（目标角度 = 动作 * scale + 默认角度）
-        decimation = 4      # 动作控制频率（仿真频率 / 控制频率 = 4，即控制频率为250Hz，应与真实机器人控制频率对齐）
+        decimation = 4      # 每个policy DT 包含的 sim DT 的个数
         hip_reduction = 1.0 # 髋关节扭矩缩放因子（用于平衡前后腿负载）
 
-    class asset(LeggedRobotCfg.asset):
+    class commands( LeggedRobotCfg.commands ):
+        curriculum = True
+        max_curriculum = 2.0
+        num_commands = 4 # default: lin_vel_x, lin_vel_y, ang_vel_yaw, heading (in heading mode ang_vel_yaw is recomputed from heading error)
+        resampling_time = 10. # time before command are changed[s]
+        heading_command = True # if true: compute ang vel command from heading error
+        class ranges( LeggedRobotCfg.commands.ranges):
+            lin_vel_x = [-1.0, 1.0]  # min max [m/s]
+            lin_vel_y = [-1.0, 1.0]  # min max [m/s]
+            ang_vel_yaw = [-3.14, 3.14]  # min max [rad/s]
+            heading = [-3.14, 3.14]
+
+    class asset( LeggedRobotCfg.asset ):
         file = '{LEGGED_GYM_ROOT_DIR}/resources/robots/aliengo/urdf/aliengo.urdf'
         name = "aliengo"    # 机器人标识名称
         foot_name = "foot"  # 足部Link名称匹配模式（如"FR_foot"、"FL_foot"等包含"foot"的）
@@ -101,26 +139,26 @@ class AlienGoRoughCfg(LeggedRobotCfg):
             stand_still = -0.
             torques = -0.0  # 关节力矩惩罚：未启用。若仿真关节过热，设为负值（如-1e-4）
             dof_vel = -0.0  # 关节速度惩罚：抑制高速抖动。若关节振荡，设为负值（如-0.01）
-            dof_pos_limits = 0.0
-            dof_vel_limits = 0.0
-            torque_limits = 0.0
+            dof_pos_limits = -0.0
+            dof_vel_limits = -0.0
+            torque_limits = -0.0
 
         only_positive_rewards = False   # 负奖励保留：为True时总奖励不低于零，避免早期训练频繁终止。复杂任务建议保持False
         tracking_sigma = 0.25   # 跟踪奖励的高斯分布标准差 = exp(-error^2 / sigma)
         soft_dof_pos_limit = 0.95   # 关节位置软限位：关节角度超过URDF限位95%时触发惩罚。调低（如0.9）可提前约束
         soft_dof_vel_limit = 0.95   # 关节速度软限位：超过最大速度95%时惩罚。保护电机模型不过载
         soft_torque_limit = 0.95    # 关节力矩软限位：超过额定扭矩95%时惩罚。防止仿真数值发散
-        base_height_target = 0.30   # 机身目标高度（低于初始高度0.55m）
+        base_height_target = 0.4   # 机身目标高度（低于初始高度0.55m）
         max_contact_force = 100.    # forces above this value are penalized
         clearance_height_target = -0.20 # 足部离地高度目标：负值表示允许触地。调为正值可强制抬腿（如0.05m）
 
 
-class AlienGoRoughCfgPPO(LeggedRobotCfgPPO):
-    class algorithm(LeggedRobotCfgPPO.algorithm):
-        entropy_coef = 0.01 # 熵系数（鼓励探索）
-
-    class runner(LeggedRobotCfgPPO.runner):
+class AlienGoRoughCfgPPO( LeggedRobotCfgPPO ):
+    class algorithm( LeggedRobotCfgPPO.algorithm ):
+        entropy_coef = 0.01  # 熵系数（鼓励探索）
+    class runner( LeggedRobotCfgPPO.runner ):
         run_name = ''
         experiment_name = 'rough_aliengo'
 
-  
+        max_iterations = 1000
+        save_interval = 100
