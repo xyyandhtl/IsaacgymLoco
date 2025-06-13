@@ -57,14 +57,14 @@ class HIMOnPolicyRunner:
         if self.env.num_privileged_obs is not None:
             num_critic_obs = self.env.num_privileged_obs 
         else:
-            num_critic_obs = self.env.num_obs
-        self.num_actor_obs = self.env.num_obs
+            num_critic_obs = self.env.num_obs  # 45 * 6
+        self.num_actor_obs = self.env.num_obs  # 45 * 6
         self.num_critic_obs = num_critic_obs
         actor_critic_class = eval(self.cfg["policy_class_name"]) # HIMActorCritic
-        actor_critic: HIMActorCritic = actor_critic_class( self.env.num_obs,
-                                                        num_critic_obs,
-                                                        self.env.num_one_step_obs,
-                                                        self.env.num_actions,
+        actor_critic: HIMActorCritic = actor_critic_class( self.env.num_obs,  # 45 * 6
+                                                        num_critic_obs,  # 45 * 6
+                                                        self.env.num_one_step_obs,  # 45
+                                                        self.env.num_actions,  # 12
                                                         **self.policy_cfg).to(self.device)
         alg_class = eval(self.cfg["algorithm_class_name"]) # HIMPPO
         self.alg: HIMPPO = alg_class(actor_critic, device=self.device, **self.alg_cfg)
@@ -222,8 +222,8 @@ class HIMOnPolicyRunner:
                        f"""{'Total timesteps:':>{pad}} {self.tot_timesteps}\n"""
                        f"""{'Iteration time:':>{pad}} {iteration_time:.2f}s\n"""
                        f"""{'Total time:':>{pad}} {self.tot_time:.2f}s\n"""
-                       f"""{'ETA:':>{pad}} {self.tot_time / (locs['it'] + 1) * (
-                               locs['num_learning_iterations'] - locs['it']):.1f}s\n""")
+                       f"""{'ETA:':>{pad}} {format_time(self.tot_time / (locs['it'] + 1) * (
+                               locs['num_learning_iterations'] - locs['it']))}\n""")
         print(log_string)
 
     def save(self, path, infos=None):
@@ -249,3 +249,22 @@ class HIMOnPolicyRunner:
         if device is not None:
             self.alg.actor_critic.to(device)
         return self.alg.actor_critic.act_inference
+
+
+def format_time(seconds):
+    days = int(seconds // (24 * 3600))
+    hours = int((seconds % (24 * 3600)) // 3600)
+    minutes = int((seconds % 3600) // 60)
+    seconds = int(seconds % 60)
+
+    time_parts = []
+    if days > 0:
+        time_parts.append(f"{days} ds ")
+    if hours > 0:
+        time_parts.append(f"{hours} hs ")
+    if minutes > 0:
+        time_parts.append(f"{minutes} ms ")
+    if seconds > 0 or not time_parts:
+        time_parts.append(f"{seconds} s")
+
+    return "".join(time_parts)

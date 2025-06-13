@@ -10,8 +10,8 @@ from torch.distributions import Normal, Categorical
 
 class HIMEstimator(nn.Module):
     def __init__(self,
-                 temporal_steps,
-                 num_one_step_obs,
+                 temporal_steps,  # 6
+                 num_one_step_obs,  # 45
                  enc_hidden_dims=[128, 64, 16],
                  tar_hidden_dims=[128, 64],
                  activation='elu',
@@ -26,7 +26,7 @@ class HIMEstimator(nn.Module):
         super(HIMEstimator, self).__init__()
         activation = get_activation(activation)
 
-        self.temporal_steps = temporal_steps
+        self.temporal_steps = temporal_steps  # 6
         self.num_one_step_obs = num_one_step_obs
         self.num_latent = enc_hidden_dims[-1]
         self.max_grad_norm = max_grad_norm

@@ -66,18 +66,29 @@ class LeggedRobot(BaseTask):
         self.sim_params = sim_params
         self.height_samples = None
         self.debug_viz = False
-        self.init_done = False
-        self._parse_cfg(self.cfg)
-        super().__init__(self.cfg, sim_params, physics_engine, sim_device, headless)
-        self.num_one_step_obs = self.cfg.env.num_one_step_observations
-        self.num_one_step_privileged_obs = self.cfg.env.num_one_step_privileged_obs
-        self.history_length = int(self.num_obs / self.num_one_step_obs)
 
+        # 2. ------ 初始化 ------
+        self.init_done = False
+        # 2.1 初始化RL训练中每个episode的总步数（1000步）、域随机化中施加推力的步数间隔（800步）、obs的scale、rewars的scale、commands的范围
+        self._parse_cfg(self.cfg)
+        # 2.2 调用父类 BaseTask 的初始化：
+        #   获取 env_cfg 中的 envs个数、obs维度等
+        #   创建 envs, sim, viewer
+        super().__init__(self.cfg, sim_params, physics_engine, sim_device, headless)
+        self.num_one_step_obs = self.cfg.env.num_one_step_observations  # 45
+        self.num_one_step_privileged_obs = self.cfg.env.num_one_step_privileged_obs  # 45 + 3 + 3 + 187
+        self.history_length = int(self.num_obs / self.num_one_step_obs)  # 45 * 6 / 45 = 6
+
+        # 2.4 设置观察视角
         if not self.headless:
             self.set_camera(self.cfg.viewer.pos, self.cfg.viewer.lookat)
+
+        # 2.5 创建存储 仿真 state / obs / action 的 tensor
         self._init_buffers()
+        # 2.6 将使用的 奖励函数 存放到 self.reward_functions 中，并为每个奖励函数 创建一个(num_env,)的tensor，存储在episode中每个env的奖励累计值
         self._prepare_reward_function()
         self.init_done = True
+        # ------ 初始化完成 ------
 
     def step(self, actions):
         """ Apply actions, simulate, call self.post_physics_step()
@@ -85,6 +96,8 @@ class LeggedRobot(BaseTask):
         Args:
             actions (torch.Tensor): Tensor of shape (num_envs, num_actions_per_env)
         """
+        # 2. 处理 actions
+        # (1) 裁剪到合理范围 [-6.0, 6.0]
         clip_actions = self.cfg.normalization.clip_actions
         self.actions = torch.clip(actions, -clip_actions, clip_actions).to(self.device)
 
@@ -93,35 +106,53 @@ class LeggedRobot(BaseTask):
         if self.cfg.domain_rand.delay:
             for i in range(self.cfg.control.decimation):
                 self.delayed_actions[:, i] = self.last_actions + (self.actions - self.last_actions) * (i >= delay_steps)
-        # step physics and render each frame
+        # 3. 渲染环境（非headless模式）
         self.render()
+
+        # 4. 执行一个 control 步（包含 4 个物理仿真步）
         for _ in range(self.cfg.control.decimation):
+            # 从 actions 计算 扭矩 (num_envs, 12)
             self.torques = self._compute_torques(self.delayed_actions[:, _]).view(self.torques.shape)
+            # 应用 该扭矩 到 仿真环境
             self.gym.set_dof_actuation_force_tensor(self.sim, gymtorch.unwrap_tensor(self.torques))
-            self.gym.simulate(self.sim)
+            self.gym.simulate(self.sim)  # 执行物理仿真
             if self.device == 'cpu':
-                self.gym.fetch_results(self.sim, True)
-            self.gym.refresh_dof_state_tensor(self.sim)
+                self.gym.fetch_results(self.sim, True)  # 获取仿真结果
+            self.gym.refresh_dof_state_tensor(self.sim)  # 更新 关节状态
+
+        # 5. 执行 4个物理仿真步后的 操作
+        # (1) 计算 奖励
+        # (2) 计算 新的观测（privileged_obs_buf 和 obs_buf，都是 (num_envs, 285)）
+        # (3) 重置某些env 获取它们的AMP观测
+        # (4) 更新 depth_buffer
+        # (5) 更新上一control步的数据（action、关节位置、关节速度、扭矩、base的线速度和角速度）
+        #   返回： 需要重置的env的 ID (num_envs_,) 以及这些 env 的 AMP观测 (num_envs_, 30)
         termination_ids, termination_priveleged_obs = self.post_physics_step()
 
-        # return clipped obs, clipped states (None), rewards, dones and infos
+        # 5.1 裁剪 观测obs_buf 到 [-100., 100.]
         clip_obs = self.cfg.normalization.clip_observations
         self.obs_buf = torch.clip(self.obs_buf, -clip_obs, clip_obs)
+        # 5.3 裁剪 特权观测privileged_obs_buf 到 [-100., 100.]
         if self.privileged_obs_buf is not None:
             self.privileged_obs_buf = torch.clip(self.privileged_obs_buf, -clip_obs, clip_obs)
         return self.obs_buf, self.privileged_obs_buf, self.rew_buf, self.reset_buf, self.extras, termination_ids, termination_priveleged_obs
 
     def post_physics_step(self):
-        """ check terminations, compute observations and rewards
-            calls self._post_physics_step_callback() for common computations 
-            calls self._draw_debug_vis() if needed
         """
-        self.gym.refresh_actor_root_state_tensor(self.sim)
-        self.gym.refresh_net_contact_force_tensor(self.sim)
-        self.gym.refresh_rigid_body_state_tensor(self.sim)
+        计算 奖励、观测、重置某些env 获取它们的AMP观测、更新depth_buffer、更新上一control步的数据（action、关节位置、关节速度、扭矩、base的线速度和角速度）
 
-        self.episode_length_buf += 1
-        self.common_step_counter += 1
+        Returns:
+            env_ids: 需要重置的env的 ID (num_envs_,)
+            terminal_amp_states: 需要重置的 env 的 AMP观测 (num_envs_, 30)
+        """
+        # 1. 从 Isaac Gym 仿真器中刷新各种状态张量，确保数据是最新的
+        self.gym.refresh_actor_root_state_tensor(self.sim)   # 刷新 根状态 张量
+        self.gym.refresh_net_contact_force_tensor(self.sim)  # 刷新 净接触力 张量
+        self.gym.refresh_rigid_body_state_tensor(self.sim)   # 刷新 刚体状态 张量
+
+        # 2. 增加 当前回合的 步数计数器 和 通用步数计数器
+        self.episode_length_buf += 1   # 当前回合的步数 +1
+        self.common_step_counter += 1  # 通用步数计数器 +1
 
         # prepare quantities
         self.base_quat[:] = self.root_states[:, 3:7]
@@ -173,20 +204,24 @@ class LeggedRobot(BaseTask):
         """
         if len(env_ids) == 0:
             return
-        # update curriculum
+
+        # 1. 更新地形课程（根据机器人表现调整地形难度）
         if self.cfg.terrain.curriculum:
             self._update_terrain_curriculum(env_ids)
-        # avoid updating command curriculum at each step since the maximum command is common to all envs
-        if self.cfg.commands.curriculum and (self.common_step_counter % self.max_episode_length==0):
+
+        # 2. 更新命令课程（调整速度命令范围）
+        # 避免每步都更新，因为最大命令对所有环境是共享的
+        if self.cfg.commands.curriculum and (self.common_step_counter % self.max_episode_length == 0):
             self.update_command_curriculum(env_ids)
         
-        # reset robot states
+        # 使用默认方式初始化状态
         self._reset_dofs(env_ids)
         self._reset_root_states(env_ids)
 
+        # 4. 为重置的 env 重新采样 运动 commands
         self._resample_commands(env_ids)
 
-        # reset buffers
+        # 6. 重置各种缓冲区
         self.last_actions[env_ids] = 0.
         self.last_last_actions[env_ids] = 0.
         self.last_dof_vel[env_ids] = 0.
@@ -244,7 +279,7 @@ class LeggedRobot(BaseTask):
     def compute_observations(self):
         """ Computes observations
         """
-        current_obs = torch.cat((   self.commands[:, :3] * self.commands_scale,
+        current_obs = torch.cat((   self.commands[:, :3] * self.commands_scale,  # * [2, 2, 0.25]
                                     self.base_ang_vel  * self.obs_scales.ang_vel,
                                     self.projected_gravity,
                                     (self.dof_pos - self.default_dof_pos) * self.obs_scales.dof_pos,
@@ -262,7 +297,7 @@ class LeggedRobot(BaseTask):
             heights += (2 * torch.rand_like(heights) - 1) * self.noise_scale_vec[(9 + 3 * self.num_actions):(9 + 3 * self.num_actions+187)]
             current_obs = torch.cat((current_obs, heights), dim=-1)
 
-        self.obs_buf = torch.cat((current_obs[:, :self.num_one_step_obs], self.obs_buf[:, :-self.num_one_step_obs]), dim=-1)
+        self.obs_buf = torch.cat((current_obs[:, :self.num_one_step_obs], self.obs_buf[:, :-self.num_one_step_obs]), dim=-1)  # 6 steps
         self.privileged_obs_buf = torch.cat((current_obs[:, :self.num_one_step_privileged_obs], self.privileged_obs_buf[:, :-self.num_one_step_privileged_obs]), dim=-1)
 
     def get_current_obs(self):
@@ -315,9 +350,11 @@ class LeggedRobot(BaseTask):
         """
         self.up_axis_idx = 2 # 2 for z, 1 for y -> adapt gravity accordingly
         self.sim = self.gym.create_sim(self.sim_device_id, self.graphics_device_id, self.physics_engine, self.sim_params)
+        # 创建 terrain
         mesh_type = self.cfg.terrain.mesh_type
         if mesh_type in ['heightfield', 'trimesh']:
             self.terrain = Terrain(self.cfg.terrain, self.num_envs)
+
         if mesh_type=='plane':
             self._create_ground_plane()
         elif mesh_type=='heightfield':
@@ -326,6 +363,7 @@ class LeggedRobot(BaseTask):
             self._create_trimesh()
         elif mesh_type is not None:
             raise ValueError("Terrain mesh type not recognised. Allowed types are [None, plane, heightfield, trimesh]")
+        # 创建 agents
         self._create_envs()
 
     def set_camera(self, position, lookat):
@@ -822,7 +860,9 @@ class LeggedRobot(BaseTask):
         rigid_shape_props_asset = self.gym.get_asset_rigid_shape_properties(robot_asset)
 
         # save body names from the asset
+        # ['base', 'FL_hip', 'FL_thigh', 'FL_calf', 'FL_foot', 'FR_hip', 'FR_thigh', 'FR_calf', 'FR_foot', 'RL_hip', 'RL_thigh', 'RL_calf', 'RL_foot', 'RR_hip', 'RR_thigh', 'RR_calf', 'RR_foot']
         body_names = self.gym.get_asset_rigid_body_names(robot_asset)
+        # ['FL_hip_joint', 'FL_thigh_joint', 'FL_calf_joint', 'FR_hip_joint', 'FR_thigh_joint', 'FR_calf_joint', 'RL_hip_joint', 'RL_thigh_joint', 'RL_calf_joint', 'RR_hip_joint', 'RR_thigh_joint', 'RR_calf_joint']
         self.dof_names = self.gym.get_asset_dof_names(robot_asset)
         self.num_bodies = len(body_names)
         self.num_dofs = len(self.dof_names)
@@ -918,16 +958,16 @@ class LeggedRobot(BaseTask):
             self.env_origins[:, 2] = 0.
 
     def _parse_cfg(self, cfg):
-        self.dt = self.cfg.control.decimation * self.sim_params.dt
-        self.obs_scales = self.cfg.normalization.obs_scales
+        self.dt = self.cfg.control.decimation * self.sim_params.dt  # 4 * 0.005 = 0.02
+        self.obs_scales = self.cfg.normalization.obs_scales  # (2.0, 0.25, 1.0, 0.05, 5.0)
         self.reward_scales = class_to_dict(self.cfg.rewards.scales)
         self.command_ranges = class_to_dict(self.cfg.commands.ranges)
         if self.cfg.terrain.mesh_type not in ['heightfield', 'trimesh']:
             self.cfg.terrain.curriculum = False
-        self.max_episode_length_s = self.cfg.env.episode_length_s
-        self.max_episode_length = np.ceil(self.max_episode_length_s / self.dt)
+        self.max_episode_length_s = self.cfg.env.episode_length_s  # 20s
+        self.max_episode_length = np.ceil(self.max_episode_length_s / self.dt)  # 20s / 0.02 = 1000 steps
 
-        self.cfg.domain_rand.push_interval = np.ceil(self.cfg.domain_rand.push_interval_s / self.dt)
+        self.cfg.domain_rand.push_interval = np.ceil(self.cfg.domain_rand.push_interval_s / self.dt)  # 16s / 0.02 = 800 steps
 
     def _draw_debug_vis(self):
         """ Draws visualizations for dubugging (slows down simulation a lot).
@@ -976,7 +1016,7 @@ class LeggedRobot(BaseTask):
         x = torch.tensor([-0.15, -0.1, -0.05, 0., 0.05, 0.1, 0.15], device=self.device, requires_grad=False)
         grid_x, grid_y = torch.meshgrid(x, y)
 
-        self.num_base_height_points = grid_x.numel()
+        self.num_base_height_points = grid_x.numel()  # 9 * 7 = 63
         points = torch.zeros(self.num_envs, self.num_base_height_points, 3, device=self.device, requires_grad=False)
         points[:, :, 0] = grid_x.flatten()
         points[:, :, 1] = grid_y.flatten()
