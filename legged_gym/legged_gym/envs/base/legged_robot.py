@@ -149,6 +149,7 @@ class LeggedRobot(BaseTask):
         # 1. 从 Isaac Gym 仿真器中刷新各种状态张量，确保数据是最新的
         self.gym.refresh_actor_root_state_tensor(self.sim)   # 刷新 根状态 张量
         self.gym.refresh_net_contact_force_tensor(self.sim)  # 刷新 净接触力 张量
+        self.gym.refresh_force_sensor_tensor(self.sim)       # 刷新 力传感器 张量
         self.gym.refresh_rigid_body_state_tensor(self.sim)   # 刷新 刚体状态 张量
 
         # 2. 增加 当前回合的 步数计数器 和 通用步数计数器
@@ -188,7 +189,9 @@ class LeggedRobot(BaseTask):
         self.disturbance[:, :, :] = 0.0
         self.last_last_actions[:] = self.last_actions[:]
         self.last_actions[:] = self.actions[:]
+        self.last_dof_pos[:] = self.dof_pos[:]
         self.last_dof_vel[:] = self.dof_vel[:]
+        self.last_torques[:] = self.torques[:]
         self.last_root_vel[:] = self.root_states[:, 7:13]
 
         if self.viewer and self.enable_viewer_sync and self.debug_viz:
@@ -245,7 +248,9 @@ class LeggedRobot(BaseTask):
         # 6. 重置各种缓冲区
         self.last_actions[env_ids] = 0.
         self.last_last_actions[env_ids] = 0.
+        self.last_dof_pos[env_ids] = 0.
         self.last_dof_vel[env_ids] = 0.
+        self.last_torques[env_ids] = 0.
         self.feet_air_time[env_ids] = 0.
         self.reset_buf[env_ids] = 1
 
@@ -562,13 +567,12 @@ class LeggedRobot(BaseTask):
 
         # 根据控制类型计算扭矩
         control_type = self.cfg.control.control_type
-        if control_type=="P":
         if control_type=="P":  # 位置控制模式
             # 扭矩 = P增益 * (目标位置 - 当前位置) + D增益 * 当前速度            其中，目标位置 = actions * action_scale + default_dof_pos
             torques = self.p_gains * self.Kp_factors * (self.joint_pos_target - self.dof_pos) - self.d_gains * self.Kd_factors * self.dof_vel
         elif control_type=="V":  # 速度控制模式
             # 扭矩 = P增益 * (目标速度 - 当前速度) + D增益 * 加速度              其中，加速度 = (当前速度 - 上一时刻速度) / 物理时间步长
-            torques = self.p_gains*(actions_scaled - self.dof_vel) - self.d_gains*(self.dof_vel - self.last_dof_vel)/self.sim_params.dt
+            torques = self.p_gains * (actions_scaled - self.dof_vel) - self.d_gains * (self.dof_vel - self.last_dof_vel) / self.sim_params.dt
         elif control_type=="T":  # 扭矩控制模式
             # 直接使用 缩放后的action 作为 扭矩
             torques = actions_scaled
@@ -745,8 +749,10 @@ class LeggedRobot(BaseTask):
         self.actions = torch.zeros(self.num_envs, self.num_actions, dtype=torch.float, device=self.device, requires_grad=False)
         self.last_actions = torch.zeros(self.num_envs, self.num_actions, dtype=torch.float, device=self.device, requires_grad=False)
         self.last_last_actions = torch.zeros(self.num_envs, self.num_actions, dtype=torch.float, device=self.device, requires_grad=False)
+
+        self.last_dof_pos = torch.zeros_like(self.dof_pos)
         self.last_dof_vel = torch.zeros_like(self.dof_vel)
-        self.last_root_vel = torch.zeros_like(self.root_states[:, 7:13])
+        self.last_torques = torch.zeros_like(self.torques)
         self.last_root_vel = torch.zeros_like(self.root_states[:, 7:13])  # base的 线速度 + 角速度
         self.commands = torch.zeros(self.num_envs, self.cfg.commands.num_commands, dtype=torch.float, device=self.device, requires_grad=False) # x vel, y vel, yaw vel, heading
         self.commands_scale = torch.tensor([self.obs_scales.lin_vel, self.obs_scales.lin_vel, self.obs_scales.ang_vel], device=self.device, requires_grad=False,) # TODO change this
@@ -826,7 +832,7 @@ class LeggedRobot(BaseTask):
             name = '_reward_' + name
             self.reward_functions.append(getattr(self, name))
 
-        # reward episode sums
+        # 当前episode的 所有env的 奖励之和：为 每个scale非0的 奖励函数 创建一个 tensor (num_env, )
         self.episode_sums = {name: torch.zeros(self.num_envs, dtype=torch.float, device=self.device, requires_grad=False)
                              for name in self.reward_scales.keys()}
 
@@ -1205,12 +1211,36 @@ class LeggedRobot(BaseTask):
         # 奖励 跟踪 commands 中XY方向的 线速度
         lin_vel_error = torch.sum(torch.square(self.commands[:, :2] - self.base_lin_vel[:, :2]), dim=1)
         return torch.exp(-lin_vel_error/self.cfg.rewards.tracking_sigma)
+
+        # # clipping tracking reward
+        # lin_vel = self.base_lin_vel[:, :2].clone()
+        # # 实际速度的 上限/下限 = commands中XY方向线速度 分别 ± lin_vel_clip（0.1）
+        # lin_vel_upper_bound = torch.where(self.commands[:, :2] < 0, 1e5, self.commands[:, :2] + self.cfg.rewards.lin_vel_clip)
+        # lin_vel_lower_bound = torch.where(self.commands[:, :2] > 0, -1e5, self.commands[:, :2] - self.cfg.rewards.lin_vel_clip)
+        # # 对实际速度进行裁剪，限制在（commands速度 ± lin_vel_clip范围内）
+        # clip_lin_vel = torch.clip(lin_vel, lin_vel_lower_bound, lin_vel_upper_bound)
+        # lin_vel_error = torch.sum(torch.square(self.commands[:, :2] - clip_lin_vel), dim=1)
+        # return torch.exp(-lin_vel_error / self.cfg.rewards.tracking_sigma)  # 误差 ==> [0,1]之间的奖励值
     
     def _reward_tracking_ang_vel(self):
         # 奖励 跟踪 commands 中yaw方向角速度
         ang_vel_error = torch.square(self.commands[:, 2] - self.base_ang_vel[:, 2])
         return torch.exp(-ang_vel_error/self.cfg.rewards.tracking_sigma)
-    
+
+    def _reward_feet_air_time(self):
+        # 奖励 四足的空中时间接近0.5s (2Hz)
+        # 需过滤接触力信号，因为PhysX引擎在复杂地形上接触力检测不可靠
+        contact = self.contact_forces[:, self.feet_indices, 2] > 1.  # 检测z轴力 > 1N 的接触
+        contact_filt = torch.logical_or(contact, self.last_contacts)  # 当前帧和上一帧的 有1次触地即可
+        self.last_contacts = contact
+        first_contact = (self.feet_air_time > 0.) * contact_filt  # 只考虑从空中首次触地的情况
+        self.feet_air_time += self.dt  # 累加 policy 步长（0.02s）
+        rew_airTime = torch.sum((self.feet_air_time - 0.5) * first_contact, dim=1)  # 仅奖励第一次触地，且计算与目标时间0.5s的偏差奖励
+        rew_airTime *= torch.norm(self.commands[:, :2], dim=1) > 0.1  # commands线速度 > 0.1 时才奖励
+        self.feet_air_time *= ~contact_filt  # 当前帧 触地的足 空中时间清0
+        return rew_airTime
+
+    # ------------ penalty functions ------------
     def _reward_lin_vel_z(self):
         # 惩罚 base 的 Z 轴线速度（防止跳跃）
         return torch.square(self.base_lin_vel[:, 2])
@@ -1222,33 +1252,38 @@ class LeggedRobot(BaseTask):
     def _reward_orientation(self):
         # 惩罚 base 非水平姿态
         return torch.sum(torch.square(self.projected_gravity[:, :2]), dim=1)
-    
-    def _reward_dof_acc(self):
-        # Penalize dof accelerations
-        return torch.sum(torch.square((self.last_dof_vel - self.dof_vel) / self.dt), dim=1)
-    
-    def _reward_joint_power(self):
-        #Penalize high power
-        return torch.sum(torch.abs(self.dof_vel) * torch.abs(self.torques), dim=1)
 
     def _reward_base_height(self):
         # 惩罚 base 偏离目标高度
         base_height = self._get_base_heights()
         return torch.square(base_height - self.cfg.rewards.base_height_target)
-    
-    def _reward_foot_clearance(self):
-        cur_footpos_translated = self.feet_pos - self.root_states[:, 0:3].unsqueeze(1)
-        footpos_in_body_frame = torch.zeros(self.num_envs, len(self.feet_indices), 3, device=self.device)
-        cur_footvel_translated = self.feet_vel - self.root_states[:, 7:10].unsqueeze(1)
-        footvel_in_body_frame = torch.zeros(self.num_envs, len(self.feet_indices), 3, device=self.device)
-        for i in range(len(self.feet_indices)):
-            footpos_in_body_frame[:, i, :] = quat_rotate_inverse(self.base_quat, cur_footpos_translated[:, i, :])
-            footvel_in_body_frame[:, i, :] = quat_rotate_inverse(self.base_quat, cur_footvel_translated[:, i, :])
-        
-        height_error = torch.square(footpos_in_body_frame[:, :, 2] - self.cfg.rewards.clearance_height_target).view(self.num_envs, -1)
-        foot_leteral_vel = torch.sqrt(torch.sum(torch.square(footvel_in_body_frame[:, :, :2]), dim=2)).view(self.num_envs, -1)
-        return torch.sum(height_error * foot_leteral_vel, dim=1)
-    
+
+    # --- dof velocity ---
+    def _reward_dof_vel(self):
+        # 惩罚 关节速度
+        return torch.sum(torch.square(self.dof_vel), dim=1)
+
+    def _reward_dof_acc(self):
+        # 惩罚 关节速度的变化
+        return torch.sum(torch.square((self.last_dof_vel - self.dof_vel) / self.dt), dim=1)
+
+    def _reward_dof_vel_limits(self):
+        # 惩罚 关节速度接近极限
+        # 裁剪至 max error = 每个关节 1 rad/s，以避免 巨大惩罚
+        return torch.sum((torch.abs(self.dof_vel) - self.dof_vel_limits*self.cfg.rewards.soft_dof_vel_limit).clip(min=0., max=1.), dim=1)
+
+    # --- dof position ---
+    def _reward_dof_pos_dif(self):
+        # 惩罚 关节位置 的变化
+        return torch.sum(torch.square(self.last_dof_pos - self.dof_pos), dim=1)
+
+    def _reward_dof_pos_limits(self):
+        # 惩罚 关节位置接近极限
+        out_of_limits = -(self.dof_pos - self.dof_pos_limits[:, 0]).clip(max=0.) # lower limit
+        out_of_limits += (self.dof_pos - self.dof_pos_limits[:, 1]).clip(min=0.)
+        return torch.sum(out_of_limits, dim=1)
+
+    # --- actions ---
     def _reward_action_rate(self):
         # 惩罚 action 的变化（使机器人运动更加平滑连续）
         return torch.sum(torch.square(self.last_actions - self.actions), dim=1)
@@ -1256,15 +1291,38 @@ class LeggedRobot(BaseTask):
     def _reward_smoothness(self):
         # 惩罚 action 的二阶平滑性（使动作更加平缓）
         return torch.sum(torch.square(self.actions - self.last_actions - self.last_actions + self.last_last_actions), dim=1)
-    
+
+    # --- torques ---
     def _reward_torques(self):
         # 惩罚 关节扭矩过大（防止关节过热或损坏）
         return torch.sum(torch.square(self.torques), dim=1)
 
-    def _reward_dof_vel(self):
-        # Penalize dof velocities
-        return torch.sum(torch.square(self.dof_vel), dim=1)
-    
+    def _reward_torques_distribution(self):
+        # 惩罚 关节扭矩分布不均
+        return torch.var(torch.abs(self.torques), dim=1)
+
+    def _reward_torques_dif(self):
+        # 惩罚 关节扭矩的变化
+        return torch.sum(torch.square(self.torques - self.last_torques), dim=1)
+
+    def _reward_torque_limits(self):
+        # 惩罚 关节扭矩接近极限
+        return torch.sum((torch.abs(self.torques) - self.torque_limits*self.cfg.rewards.soft_torque_limit).clip(min=0.), dim=1)
+
+    # --- power ---
+    def _reward_joint_power(self):
+        # 惩罚 高功率
+        return torch.sum(torch.abs(self.dof_vel) * torch.abs(self.torques), dim=1)
+
+    def _reward_power(self):
+        # 惩罚 关节功率消耗（扭矩 * 关节速度）
+        return torch.sum(torch.abs(self.torques * self.dof_vel), dim=1)
+
+    def _reward_power_distribution(self):
+        # 惩罚 关节功率消耗分布不均
+        return torch.var(torch.abs(self.torques * self.dof_vel), dim=1)
+
+    # --- collision, termination
     def _reward_collision(self):
         # 惩罚 指定关节的碰撞
         # 当指定关节接触力的 模 > 0.1N，则判定发生碰撞，计为 1
@@ -1273,44 +1331,84 @@ class LeggedRobot(BaseTask):
     def _reward_termination(self):
         # Terminal reward / penalty
         return self.reset_buf * ~self.time_out_buf
+
+    # --- feet contact ---
+    def _reward_feet_contact_forces(self):
+        # 惩罚 四足接触力过大（需<100）
+        return torch.sum((torch.norm(self.contact_forces[:, self.feet_indices, :], dim=-1) -  self.cfg.rewards.max_contact_force).clip(min=0.), dim=1)
     
-    def _reward_dof_pos_limits(self):
-        # Penalize dof positions too close to the limit
-        out_of_limits = -(self.dof_pos - self.dof_pos_limits[:, 0]).clip(max=0.) # lower limit
-        out_of_limits += (self.dof_pos - self.dof_pos_limits[:, 1]).clip(min=0.)
-        return torch.sum(out_of_limits, dim=1)
+    def _reward_feet_stumble(self):
+        # 惩罚 脚接触垂直表面
+        # 判定条件： XY方向 足部接触力 与 Z轴接触力 之比 > 4
+        rew = torch.any(torch.norm(self.contact_forces[:, self.feet_indices, :2], dim=2) > \
+             4 *torch.abs(self.contact_forces[:, self.feet_indices, 2]), dim=1)
+        rew = rew * (self.terrain_levels > 3)
+        rew = rew.float()
+        return rew
 
-    def _reward_dof_vel_limits(self):
-        # Penalize dof velocities too close to the limit
-        # clip to max error = 1 rad/s per joint to avoid huge penalties
-        return torch.sum((torch.abs(self.dof_vel) - self.dof_vel_limits*self.cfg.rewards.soft_dof_vel_limit).clip(min=0., max=1.), dim=1)
-
-    def _reward_torque_limits(self):
-        # penalize torques too close to the limit
-        return torch.sum((torch.abs(self.torques) - self.torque_limits*self.cfg.rewards.soft_torque_limit).clip(min=0.), dim=1)
-
-    def _reward_feet_air_time(self):
-        # Reward long steps
-        # Need to filter the contacts because the contact reporting of PhysX is unreliable on meshes
-        contact = self.contact_forces[:, self.feet_indices, 2] > 1.
-        contact_filt = torch.logical_or(contact, self.last_contacts) 
-        self.last_contacts = contact
-        first_contact = (self.feet_air_time > 0.) * contact_filt
-        self.feet_air_time += self.dt
-        rew_airTime = torch.sum((self.feet_air_time - 0.5) * first_contact, dim=1) # reward only on first contact with the ground
-        rew_airTime *= torch.norm(self.commands[:, :2], dim=1) > 0.1 #no reward for zero command
-        self.feet_air_time *= ~contact_filt
-        return rew_airTime
-    
-    def _reward_stumble(self):
-        # Penalize feet hitting vertical surfaces
-        return torch.any(torch.norm(self.contact_forces[:, self.feet_indices, :2], dim=2) >\
-             5 *torch.abs(self.contact_forces[:, self.feet_indices, 2]), dim=1)
-        
+    # --- stand, stuck ---
     def _reward_stand_still(self):
         # 惩罚 commands 速度接近0时（<0.1 m/s）的 关节位置 与 默认关节位置的 偏差
         return torch.sum(torch.abs(self.dof_pos - self.default_dof_pos), dim=1) * (torch.norm(self.commands[:, :2], dim=1) < 0.1)
 
-    def _reward_feet_contact_forces(self):
-        # 惩罚 四足接触力过大（需<100）
-        return torch.sum((torch.norm(self.contact_forces[:, self.feet_indices, :], dim=-1) -  self.cfg.rewards.max_contact_force).clip(min=0.), dim=1)
+    def _reward_stuck(self):
+        # 惩罚 卡住
+        # 判定是否卡住：base 的 X方向线速度 < 0.1 m/s，但 commands 的 X方向线速度 > 0.1 m/s
+        return (torch.abs(self.base_lin_vel[:, 0]) < 0.1) * (torch.abs(self.commands[:, 0]) > 0.1)
+
+    # --- hip joint ---
+    def _reward_hip_action_magnitude(self):
+        # 限制 action 中的 髋关节hip（0,3,6,9）动作幅度（防止 > 1.0）
+        return torch.sum(torch.square(torch.maximum(torch.abs(self.actions[:, [0, 3, 6, 9]]) - 1.0,
+                                                    torch.zeros_like(self.actions[:, [0, 3, 6, 9]]))), dim=1)
+
+    def _reward_hip_pos(self):
+        # 惩罚 髋关节hip（0,3,6,9）与默认位置的偏差
+        return torch.sum(torch.square(self.dof_pos[:, [0,3,6,9]] - self.default_dof_pos[:, [0,3,6,9]]), dim=1)
+
+    # -------- 四足离地高度 ------
+    def _reward_foot_clearance1(self):
+        # 惩罚 大速度下 四足抬脚距base的高度 偏离目标距离 （-0.2 m）
+        # 当前四足相对base的 位置 和 线速度（世界坐标系）
+        cur_footpos_translated = self.feet_pos - self.root_states[:, 0:3].unsqueeze(1)
+        cur_footvel_translated = self.feet_vel - self.root_states[:, 7:10].unsqueeze(1)
+        # 当前四足相对base的 位置 和 线速度（body坐标系）
+        footpos_in_body_frame = torch.zeros(self.num_envs, len(self.feet_indices), 3, device=self.device)  # (num_envs, 4, 3)
+        footvel_in_body_frame = torch.zeros(self.num_envs, len(self.feet_indices), 3, device=self.device)
+        for i in range(len(self.feet_indices)):
+            footpos_in_body_frame[:, i, :] = quat_rotate_inverse(self.base_quat, cur_footpos_translated[:, i, :])
+            footvel_in_body_frame[:, i, :] = quat_rotate_inverse(self.base_quat, cur_footvel_translated[:, i, :])
+
+        # 四足相对base的高度 距 目标高度 的误差（平方误差）
+        height_error = torch.square(footpos_in_body_frame[:, :, 2] - self.cfg.rewards.foot_height_target_base).view(self.num_envs, -1)
+        # 四足相对base的 线速度 的模
+        foot_leteral_vel = torch.sqrt(torch.sum(torch.square(footvel_in_body_frame[:, :, :2]), dim=2)).view(self.num_envs, -1)
+        return torch.sum(height_error * foot_leteral_vel, dim=1)
+
+    def _reward_foot_clearance2(self):
+        # 惩罚 大速度下 四足的抬脚高度 需接近 离地目标高度（0.15m）
+        if self.cfg.terrain.mesh_type == 'plane':
+            foot_heights = self.feet_pos[:, :, 2]  # 四足的 高度 (num_envs, 4, 1)
+        else:
+            points = self.feet_pos  # 四足的位置 (num_envs, 4, 3)
+
+            # 测量 四足位置下方的 地形高度
+            points += self.terrain.cfg.border_size  # + 边界的偏移 25
+            points = (points / self.terrain.cfg.horizontal_scale).long()  # / 0.1，归一化到地形网格坐标
+            px = points[:, :, 0].view(-1)
+            py = points[:, :, 1].view(-1)
+            px = torch.clip(px, 0, self.height_samples.shape[0] - 2)
+            py = torch.clip(py, 0, self.height_samples.shape[1] - 2)
+
+            heights1 = self.height_samples[px, py]
+            heights2 = self.height_samples[px + 1, py]
+            heights3 = self.height_samples[px, py + 1]
+            heights = torch.min(heights1, heights2)
+            heights = torch.min(heights, heights3)
+
+            ground_heights = torch.reshape(heights, (self.num_envs, -1)) * self.terrain.cfg.vertical_scale  # 地形高度 转换为 实际的米单位 (num_evns, 4)
+            foot_heights = self.feet_pos[:, :, 2] - ground_heights  # 四足相对地形的 高度
+
+        foot_lateral_vel = torch.norm(self.feet_vel[:, :, :2], dim = -1)
+        # return torch.sum(foot_lateral_vel * torch.maximum(-foot_heights + self.cfg.rewards.foot_height_target, torch.zeros_like(foot_heights)), dim = -1)
+        return torch.sum(foot_lateral_vel * torch.square(foot_heights - self.cfg.rewards.foot_height_target_terrain), dim = -1)

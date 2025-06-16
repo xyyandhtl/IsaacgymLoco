@@ -174,35 +174,40 @@ class AlienGoRoughCfg(LeggedRobotCfg):
     class rewards(LeggedRobotCfg.rewards):
         class scales:
             termination = -0.0  # 仿真终止时的惩罚：未启用。设为负值（如-10.0）可在跌倒时给予额外惩罚
-            tracking_lin_vel = 1.0  # 线速度跟踪 奖励：机器人实际线速度与指令速度的匹配度。权重最大，主导前进/后退训练
-            tracking_ang_vel = 0.5  # 角速度跟踪 奖励：控制转向精度。若机器人转弯不稳定，可降低权重（如0.3）
-            lin_vel_z = -2.0    # 垂直速度 惩罚：防止机身跳跃。若机器人跳跃频繁，增大惩罚（如-5.0）
-            ang_vel_xy = -0.05  # 俯仰/横滚角速度 惩罚：抑制机身倾斜。跌倒时增大（如-0.2）
-            orientation = -0.2  # 姿态 惩罚：机身偏离水平面的角度惩罚。地面不平时可减小（如-0.1）
-            dof_acc = -2.5e-7   # 关节加速度 惩罚：抑制关节突变运动。若步态抖动，增大惩罚（如-1e-6）
-            joint_power = -2e-5 # 关节功率 惩罚：降低能耗。需平衡运动效率，过高惩罚会导致动作迟缓
-            base_height = -1.0  # 机身高度 惩罚：当高度低于 base_height_target (0.3m) 时触发。增大惩罚（如-2.0）可强化贴地
-            foot_clearance = -0.01  # 足部离地高度惩罚：防止抬脚过高。值越负（如-0.1）越限制抬腿幅度
-            action_rate = -0.01 # 动作变化率惩罚：相邻动作差值惩罚。调大（如-0.05）可使运动更连续
-            smoothness = -0.01  # 平滑性惩罚：高阶动作导数惩罚。复杂地形中可适当降低
-            feet_air_time = 0.0 # 足部空中时间奖励：当前未启用，设为正数可鼓励迈步（如0.2）
-            collision = -0.0    # 剧烈碰撞惩罚：未启用。检测超过 max_contact_force (100N) 的接触，设为负值（如-0.1）可防硬件过载
-            feet_stumble = -0.0 # 足部打滑惩罚：检测足部横向滑动。若打滑严重，设为负值（如-0.1
-            stand_still = -0.
-            torques = -0.0  # 关节力矩惩罚：未启用。若仿真关节过热，设为负值（如-1e-4）
-            dof_vel = -0.0  # 关节速度惩罚：抑制高速抖动。若关节振荡，设为负值（如-0.01）
-            dof_pos_limits = -0.0
-            dof_vel_limits = -0.0
-            torque_limits = -0.0
+            tracking_lin_vel = 1.0  # commands 中XY方向的 线速度跟踪 奖励，主导前进/后退训练
+            tracking_ang_vel = 0.5  # commands 中yaw方向的 角速度跟踪 奖励
+            lin_vel_z = -2.0  # base 的 Z 轴线速度 惩罚：防止机身跳跃
+            ang_vel_xy = -0.05  # base 的 XY 轴角速度 惩罚：抑制机身翻滚（roll, pitch）
+            orientation = -0.2  # base 非水平姿态 惩罚（地面不平时，可减小）
+            dof_acc = -2.5e-7  # 关节速度变化 惩罚（若步态抖动，可增大惩罚）
+            joint_power = -2e-5  # 关节高功率 惩罚：降低能耗（需平衡运动效率，过高惩罚会导致动作迟缓）
+            base_height = -1.0  # base目标高度 惩罚
+            foot_clearance1 = -0.01  # 大速度下 四足距base目标距离 惩罚
+            foot_clearance2 = -0.0  # 大速度下 四足离地目标高度 惩罚
+            action_rate = -0.01  # action变化 惩罚
+            smoothness = -0.01  # action二阶平滑性 惩罚（复杂地形，可适当降低）
+            feet_air_time = 0.0  # 四足的空中时间接近0.5s 奖励
+            collision = -0.0  # 指定关节的碰撞 惩罚：未启用。检测超过 max_contact_force (100N) 的接触，设为负值（如-0.1）可防硬件过载
+            feet_stumble = -0.0  # 脚接触垂直面 惩罚：检测足部横向滑动。若打滑严重，设为负值（如-0.1
+            stand_still = -0.0  # commands 速度接近0时（<0.1 m/s）的 关节位置 与 默认关节位置的 偏差 惩罚
+            torques = -0.0  # 关节扭矩过大 惩罚
+            dof_vel = -0.0  # 关节速度过大 惩罚
+            dof_pos_limits = -0.0  # 关节位置接近极限 惩罚
+            dof_vel_limits = -0.0  # 关节速度接近极限 惩罚
+            torque_limits = -0.0  # 关节扭矩接近极限 惩罚
+            hip_pos = -0.0  # 髋关节hip（0,3,6,9）位置与默认位置的偏差 惩罚
+            hip_action_magnitude = -0.0  # action 中的 髋关节hip（0,3,6,9）动作幅度 惩罚（防止 > 1.0）
 
         only_positive_rewards = False   # 负奖励保留：为True时总奖励不低于零，避免早期训练频繁终止。复杂任务建议保持False
         tracking_sigma = 0.25   # 跟踪奖励的高斯分布标准差 = exp(-error^2 / sigma)
         soft_dof_pos_limit = 0.95   # 关节位置软限位：关节角度超过URDF限位95%时触发惩罚。调低（如0.9）可提前约束
         soft_dof_vel_limit = 0.95   # 关节速度软限位：超过最大速度95%时惩罚。保护电机模型不过载
         soft_torque_limit = 0.95    # 关节力矩软限位：超过额定扭矩95%时惩罚。防止仿真数值发散
-        base_height_target = 0.45   # 机身目标高度（低于初始高度0.55m）
-        max_contact_force = 100.    # forces above this value are penalized
-        clearance_height_target = -0.20 # 足部离地高度目标：负值表示允许触地。调为正值可强制抬腿（如0.05m）
+        base_height_target = 0.40   # 机身目标高度（低于初始高度0.55m）
+        foot_height_target_base = -0.10  # 足部距base的 相对距离目标
+        foot_height_target_terrain = 0.15  # 足部离地高度目标
+        max_contact_force = 100.    # 四足接触力 > 100N 时触发惩罚的阈值
+        lin_vel_clip = 0.1  # 线速度误差 上下限裁剪阈值，避免过大惩罚
 
     class normalization:
         class obs_scales:
