@@ -47,15 +47,15 @@ class Terrain:
         self.env_width = cfg.terrain_width  # 8
         self.proportions = [np.sum(cfg.terrain_proportions[:i + 1]) for i in range(len(cfg.terrain_proportions))]
 
-        self.cfg.num_sub_terrains = cfg.num_rows * cfg.num_cols
+        self.cfg.num_sub_terrains = cfg.num_rows * cfg.num_cols  # 子地形的个数，10 * 20
         self.env_origins = np.zeros((cfg.num_rows, cfg.num_cols, 3))
 
-        self.width_per_env_pixels = int(self.env_width / cfg.horizontal_scale)  # 8 / 0.1 = 80
-        self.length_per_env_pixels = int(self.env_length / cfg.horizontal_scale)  # 8 / 0.1 = 80
+        self.width_per_env_pixels = int(self.env_width / cfg.horizontal_scale)  # 每个子地形在宽度方向上的 网格数量，8 / 0.1 = 80
+        self.length_per_env_pixels = int(self.env_length / cfg.horizontal_scale)  # 每个子地形在长度方向上的 网格数量，8 / 0.1 = 80
 
-        self.border = int(cfg.border_size/self.cfg.horizontal_scale)
-        self.tot_cols = int(cfg.num_cols * self.width_per_env_pixels) + 2 * self.border
-        self.tot_rows = int(cfg.num_rows * self.length_per_env_pixels) + 2 * self.border
+        self.border = int(cfg.border_size/self.cfg.horizontal_scale)  # 边界所占的网格数量，15 / 0.1 = 150
+        self.tot_cols = int(cfg.num_cols * self.width_per_env_pixels) + 2 * self.border  # 总地形网格（水平方向）的列数 20 * 80 + 2 * 150
+        self.tot_rows = int(cfg.num_rows * self.length_per_env_pixels) + 2 * self.border  # 总地形网格的行数 10 * 80 + 2 * 150
 
         self.height_field_raw = np.zeros((self.tot_rows , self.tot_cols), dtype=np.int16)
         if cfg.curriculum:

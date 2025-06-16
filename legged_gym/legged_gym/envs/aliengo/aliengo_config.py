@@ -113,8 +113,8 @@ class AlienGoRoughCfg(LeggedRobotCfg):
         file = '{LEGGED_GYM_ROOT_DIR}/resources/robots/aliengo/urdf/aliengo.urdf'
         name = "aliengo"    # 机器人标识名称
         foot_name = "foot"  # 足部Link名称匹配模式（如"FR_foot"、"FL_foot"等包含"foot"的）
-        penalize_contacts_on = ["thigh", "calf", "base"]    # 非足部区域（这里为大腿、小腿）接触地面，则触发惩罚
-        terminate_after_contacts_on = ["base"]      # （机身）接触地面，则触发终止训练
+        penalize_contacts_on = ["thigh", "calf", "base"]    # base, thigh, calf 与地形碰撞，则触发惩罚
+        terminate_after_contacts_on = ["base"]      # base 与地形碰撞，则触发终止训练
         privileged_contacts_on = ["base", "thigh", "calf"]  # 特权接触检测区域
         self_collisions = 1  # 1：禁用自身各部分之间的碰撞检测（提升性能）；0：启用
         flip_visual_attachments = True  # 翻转视觉模型坐标系（Y-up转Z-up），许多 .obj meshes 必须从 y-up 转到 z-up
@@ -137,13 +137,13 @@ class AlienGoRoughCfg(LeggedRobotCfg):
         randomize_payload_mass = True
         payload_mass_range = [-1, 2]
 
-        randomize_com_displacement = True
+        randomize_com_displacement = True  # 是否随机改变base的位置偏移
         com_displacement_range = [-0.05, 0.05]
 
         randomize_link_mass = False
         link_mass_range = [0.9, 1.1]
 
-        randomize_friction = True
+        randomize_friction = True  # 是否随机化摩擦系数
         friction_range = [0.2, 1.25]
 
         randomize_restitution = False
@@ -158,7 +158,7 @@ class AlienGoRoughCfg(LeggedRobotCfg):
         randomize_kd = True
         kd_range = [0.9, 1.1]
 
-        randomize_initial_joint_pos = True
+        randomize_initial_joint_pos = True  # 是否随机化初始关节位置
         initial_joint_pos_range = [0.5, 1.5]
 
         disturbance = True
