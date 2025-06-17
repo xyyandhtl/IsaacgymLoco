@@ -78,7 +78,7 @@ class Terrain:
             (i, j) = np.unravel_index(k, (self.cfg.num_rows, self.cfg.num_cols))
 
             choice = np.random.uniform(0, 1)
-            difficulty = np.random.choice([0.5, 0.75, 0.9])
+            difficulty = np.random.choice([0.5, 0.65, 0.8])
             terrain = self.make_terrain(choice, difficulty)
             self.add_terrain_to_map(terrain, i, j)
         
@@ -118,9 +118,16 @@ class Terrain:
                                 horizontal_scale=self.cfg.horizontal_scale)  # 0.1
         slope = min(difficulty * 0.5, 0.4)  # [0.0, ..., 0.40]
         amplitude = min(0.02 + 0.1 * difficulty, 0.06)  # [0.02, 0.03..., 0.06]
-        # step_height = 0.05 + 0.18 * difficulty  # 0.05 + [0.0, 0.018, ..., 0.162]
-        step_height = min(0.1 + 0.12 * difficulty, 0.18)  # 0.1 + [0.0, 0.012, ..., 0.06, ..., 0.108]
-        # step_height = 0.05 + 0.2 * difficulty  # 0.05 + [0.0, 0.02, ..., 0.1, ..., 0.18]
+
+        def calculate_step_height(difficulty):
+            if difficulty < 0.6:
+                step_height = 0.06 + 0.18 * difficulty  # 0.06 + [0.0, 0.018, ..., 0.09]
+            else:
+                height_at_06 = 0.06 + 0.18 * 0.6  # 0.168
+                step_height = height_at_06 + 0.12 * (difficulty - 0.6)
+            return step_height
+        step_height = calculate_step_height(difficulty)
+
         discrete_obstacles_height = 0.05 + difficulty * 0.1
         stepping_stones_size = 1.5 * (1.05 - difficulty)
         stone_distance = 0.05 if difficulty==0 else 0.1
@@ -247,11 +254,10 @@ def pyramid_stairs_terrain(terrain, step_width, step_height, platform_size=1., b
     Returns:
         terrain (SubTerrain): update terrain
     """
-    # print(f"[terrain | step_width] {step_width} / {terrain.horizontal_scale} =  {int(step_width / terrain.horizontal_scale)}")
-    step_width = int(step_width / terrain.horizontal_scale)
-    step_height = int(step_height / terrain.vertical_scale)
-    platform_size = int(platform_size / terrain.horizontal_scale)
-    border_width = int(border_width / terrain.horizontal_scale)
+    step_width = round(step_width / terrain.horizontal_scale)
+    step_height = round(step_height / terrain.vertical_scale)
+    platform_size = round(platform_size / terrain.horizontal_scale)
+    border_width = round(border_width / terrain.horizontal_scale)
 
     height = 0
     start_x = border_width
