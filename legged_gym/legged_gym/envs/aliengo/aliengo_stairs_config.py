@@ -83,7 +83,7 @@ class AlienGoStairsCfg(LeggedRobotCfg):
         num_rows = 10  # number of terrain rows (levels)
         num_cols = 20  # number of terrain cols (types)
         # terrain types: [flat, rough, smooth_slope, rough_slope, stairs_up, stairs_down, discrete_obstacles, stepping_stones, pit, gap]
-        terrain_proportions = [0.0, 0.1, 0.1, 0.0, 0.5, 0.3, 0.0, 0.0, 0.0, 0.0]
+        terrain_proportions = [0.0, 0.0, 0.1, 0.1, 0.5, 0.3, 0.0, 0.0, 0.0, 0.0]
         # trimesh only:
         slope_treshold = 0.75  # slopes above this threshold will be corrected to vertical surfaces
 
@@ -108,8 +108,8 @@ class AlienGoStairsCfg(LeggedRobotCfg):
         class ranges( LeggedRobotCfg.commands.ranges):
             lin_vel_x = [-1.0, 1.0]  # min max [m/s]
             lin_vel_y = [-0.5, 0.5]  # min max [m/s]
-            ang_vel_yaw = [-1, 1]  # min max [rad/s]
-            heading = [-1, 1]
+            ang_vel_yaw = [-1.0, 1.0]  # min max [rad/s]
+            heading = [-1.0, 1.0]
 
     class asset(LeggedRobotCfg.asset):
         file = '{LEGGED_GYM_ROOT_DIR}/resources/robots/aliengo/urdf/aliengo.urdf'
@@ -161,37 +161,47 @@ class AlienGoStairsCfg(LeggedRobotCfg):
 
     class rewards(LeggedRobotCfg.rewards):
         class scales:
-            termination = -50.
-            tracking_lin_vel = 1.0
-            tracking_ang_vel = 0.5
-            lin_vel_z = -2.0
-            ang_vel_xy = -0.05
-            orientation = -0.2
+            termination = -10.
+            tracking_lin_vel = 1.5
+            tracking_ang_vel = 0.75
+            lin_vel_z_up = -2.0
+            ang_vel_xy_up = -0.05
+            orientation_up = -0.2
             dof_acc = -2.5e-7
             joint_power = -2e-5
-            base_height = -1.0
-            foot_clearance = -0.01
+            base_height_up = -5.0
+            foot_clearance_base_up = -0.2
+            foot_clearance_base_terrain = -0.0
             action_rate = -0.01
-            smoothness = -0.01
-            feet_air_time = 0.0
-            collision = -0.0
-            feet_stumble = -0.0
-            stand_still = -0.
-            torques = -0.0
+            smoothness = -0.0
+            feet_air_time = 0.1
+            feet_mirror_up = -0.05  # 斜对称腿的关节位置偏差 惩罚
+            collision_up = -1.0
+            feet_stumble_up = -0.05
+            feet_slide_up = -0.01
+            feet_contact_forces = -0.00015  # 四足的接触力 > 100N 惩罚
+            stand_nice = -0.1  # commands 速度接近0（<0.1 m/s）且 重力投影向下时 的 关节位置与默认关节位置的 偏差 惩罚
+            torques = -0.0002
             dof_vel = -0.0
             dof_pos_limits = -0.0
             dof_vel_limits = -0.0
             torque_limits = -0.0
+            hip_pos = -0.1
+            thigh_pose = -0.1
+            calf_pose = -0.1
             stuck = -1.
+            # upward = 0.5  # 重力投影向下 奖励（0.5数量级为0.98）
+            has_contact = 0.1  # 速度<0.1时 的 接触力 奖励
 
         only_positive_rewards = False  # if true negative total rewards are clipped at zero (avoids early termination problems)
         tracking_sigma = 0.25  # tracking reward = exp(-error^2/sigma)
         soft_dof_pos_limit = 0.95  # percentage of urdf limits, values above this limit are penalized
         soft_dof_vel_limit = 0.95
         soft_torque_limit = 0.95
-        base_height_target = 0.45
+        base_height_target = 0.43
+        foot_height_target_base = -0.25  # 足部距base的 相对距离目标（抬脚高度为0.18 以适应台阶地形）
+        foot_height_target_terrain = 0.15
         max_contact_force = 100.  # forces above this value are penalized
-        clearance_height_target = -0.20
 
     class normalization:
         class obs_scales:
@@ -254,10 +264,10 @@ class AlienGoStairsCfgPPO(LeggedRobotCfgPPO):
         max_iterations = 3000  # number of policy updates
 
         # logging
-        save_interval = 200  # check for potential saves every this many iterations
-        experiment_name = 'stairs_aliengo'
+        save_interval = 100  # check for potential saves every this many iterations
+        experiment_name = 'rough_aliengo'
         run_name = ''
         # load and resume
         resume = True
-        load_run = osp.join(logs_root, 'rough_aliengo', 'May26_15-08-38_')
+        load_run = osp.join(logs_root, 'flat_aliengo', 'Jun17_10-45-18_flat')
         checkpoint = -1  # -1 = last saved model
