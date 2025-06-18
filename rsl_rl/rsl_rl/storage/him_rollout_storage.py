@@ -50,7 +50,13 @@ class HIMRolloutStorage:
         def clear(self):
             self.__init__()
 
-    def __init__(self, num_envs, num_transitions_per_env, obs_shape, privileged_obs_shape, actions_shape, device='cpu'):
+    def __init__(self,
+                 num_envs,
+                 num_transitions_per_env,  # 100
+                 obs_shape,  # [45 * 6]
+                 privileged_obs_shape,  # [45+3+3+187]
+                 actions_shape,  # [12]
+                 device='cpu'):
 
         self.device = device
 
@@ -59,26 +65,26 @@ class HIMRolloutStorage:
         self.actions_shape = actions_shape
 
         # Core
-        self.observations = torch.zeros(num_transitions_per_env, num_envs, *obs_shape, device=self.device)
+        self.observations = torch.zeros(num_transitions_per_env, num_envs, *obs_shape, device=self.device)  # (100, num_envs, 45*6)
         if privileged_obs_shape[0] is not None:
-            self.privileged_observations = torch.zeros(num_transitions_per_env, num_envs, *privileged_obs_shape, device=self.device)
+            self.privileged_observations = torch.zeros(num_transitions_per_env, num_envs, *privileged_obs_shape, device=self.device)  # (100, num_envs, 45+3+3+187)
             self.next_privileged_observations = torch.zeros(num_transitions_per_env, num_envs, *privileged_obs_shape, device=self.device)
         else:
             self.privileged_observations = None
             self.next_privileged_observations = None
-        self.rewards = torch.zeros(num_transitions_per_env, num_envs, 1, device=self.device)
-        self.actions = torch.zeros(num_transitions_per_env, num_envs, *actions_shape, device=self.device)
-        self.dones = torch.zeros(num_transitions_per_env, num_envs, 1, device=self.device).byte()
+        self.rewards = torch.zeros(num_transitions_per_env, num_envs, 1, device=self.device)  # (100, num_envs, 1)
+        self.actions = torch.zeros(num_transitions_per_env, num_envs, *actions_shape, device=self.device)  # (100, num_envs, 12)
+        self.dones = torch.zeros(num_transitions_per_env, num_envs, 1, device=self.device).byte()  # (100, num_envs, 1)
 
         # For PPO
-        self.actions_log_prob = torch.zeros(num_transitions_per_env, num_envs, 1, device=self.device)
-        self.values = torch.zeros(num_transitions_per_env, num_envs, 1, device=self.device)
-        self.returns = torch.zeros(num_transitions_per_env, num_envs, 1, device=self.device)
-        self.advantages = torch.zeros(num_transitions_per_env, num_envs, 1, device=self.device)
-        self.mu = torch.zeros(num_transitions_per_env, num_envs, *actions_shape, device=self.device)
-        self.sigma = torch.zeros(num_transitions_per_env, num_envs, *actions_shape, device=self.device)
+        self.actions_log_prob = torch.zeros(num_transitions_per_env, num_envs, 1, device=self.device)  # (100, num_envs, 1)
+        self.values = torch.zeros(num_transitions_per_env, num_envs, 1, device=self.device)  # (100, num_envs, 1)
+        self.returns = torch.zeros(num_transitions_per_env, num_envs, 1, device=self.device)  # (100, num_envs, 1)
+        self.advantages = torch.zeros(num_transitions_per_env, num_envs, 1, device=self.device)  # (100, num_envs, 1)
+        self.mu = torch.zeros(num_transitions_per_env, num_envs, *actions_shape, device=self.device)  # (100, num_envs, 12)
+        self.sigma = torch.zeros(num_transitions_per_env, num_envs, *actions_shape, device=self.device)  # (100, num_envs, 12)
 
-        self.num_transitions_per_env = num_transitions_per_env
+        self.num_transitions_per_env = num_transitions_per_env  # 100
         self.num_envs = num_envs
 
         self.step = 0
@@ -86,6 +92,8 @@ class HIMRolloutStorage:
     def add_transitions(self, transition: Transition):
         if self.step >= self.num_transitions_per_env:
             raise AssertionError("Rollout buffer overflow")
+        # 存储对应 env_step 的观测、特权观测、计算的actions、计算的价值
+        # 存储执行该actions后获取的新特权观测、计算的奖励、需要重置的envID、该actions的对数概率、该actions正态分布的均值、该actions正态分布的方差
         self.observations[self.step].copy_(transition.observations)
         if self.privileged_observations is not None: self.privileged_observations[self.step].copy_(transition.critic_observations)
         if self.next_privileged_observations is not None: self.next_privileged_observations[self.step].copy_(transition.next_critic_observations)
@@ -96,6 +104,7 @@ class HIMRolloutStorage:
         self.actions_log_prob[self.step].copy_(transition.actions_log_prob.view(-1, 1))
         self.mu[self.step].copy_(transition.action_mean)
         self.sigma[self.step].copy_(transition.action_sigma)
+        # 存储的 env_step + 1
         self.step += 1
 
     def clear(self):
@@ -126,11 +135,11 @@ class HIMRolloutStorage:
         return trajectory_lengths.float().mean(), self.rewards.mean()
 
     def mini_batch_generator(self, num_mini_batches, num_epochs=8):
-        batch_size = self.num_envs * self.num_transitions_per_env
-        mini_batch_size = batch_size // num_mini_batches
+        batch_size = self.num_envs * self.num_transitions_per_env  # num_envs * 100
+        mini_batch_size = batch_size // num_mini_batches  # (num_envs * 100) // 4
         indices = torch.randperm(num_mini_batches*mini_batch_size, requires_grad=False, device=self.device)
 
-        observations = self.observations.flatten(0, 1)
+        observations = self.observations.flatten(0, 1)  # (100 * num_envs, 45*6)
         if self.privileged_observations is not None:
             critic_observations = self.privileged_observations.flatten(0, 1)
             next_critic_observations = self.next_privileged_observations.flatten(0, 1)
@@ -146,7 +155,9 @@ class HIMRolloutStorage:
         old_mu = self.mu.flatten(0, 1)
         old_sigma = self.sigma.flatten(0, 1)
 
+        # 遍历 5 个 epoch
         for epoch in range(num_epochs):
+            # 遍历 4 个 batch（batch_size = (num_envs * 100) // 4）
             for i in range(num_mini_batches):
 
                 start = i*mini_batch_size

@@ -55,14 +55,14 @@ class HIMOnPolicyRunner:
         self.device = device
         self.env = env
         if self.env.num_privileged_obs is not None:
-            num_critic_obs = self.env.num_privileged_obs 
+            num_critic_obs = self.env.num_privileged_obs  # 45 + 3 + 3 + 187
         else:
-            num_critic_obs = self.env.num_obs  # 45 * 6
+            num_critic_obs = self.env.num_obs
         self.num_actor_obs = self.env.num_obs  # 45 * 6
         self.num_critic_obs = num_critic_obs
         actor_critic_class = eval(self.cfg["policy_class_name"]) # HIMActorCritic
         actor_critic: HIMActorCritic = actor_critic_class( self.env.num_obs,  # 45 * 6
-                                                        num_critic_obs,  # 45 * 6
+                                                        num_critic_obs,  # 45 + 3 + 3 + 187
                                                         self.env.num_one_step_obs,  # 45
                                                         self.env.num_actions,  # 12
                                                         **self.policy_cfg).to(self.device)
@@ -106,8 +106,12 @@ class HIMOnPolicyRunner:
             start = time.time()
             # Rollout
             with torch.inference_mode():
+                # 进行 num_steps_per_env 次 env_step
                 for i in range(self.num_steps_per_env):
+                    # 1. 根据当前观测 计算actions正态分布 和 价值
                     actions = self.alg.act(obs, critic_obs)
+                    # 2. 在仿真环境中应用该actions，执行执行一个 env_step（包含 4 个sim_step）
+                    # 获取：新观测、新特权观测、奖励buffer、重置buffer、额外信息、要重置env的ID、要重置env的特权观测
                     obs, privileged_obs, rewards, dones, infos, termination_ids, termination_privileged_obs = self.env.step(actions)
 
                     critic_obs = privileged_obs if privileged_obs is not None else obs
@@ -117,14 +121,14 @@ class HIMOnPolicyRunner:
 
                     next_critic_obs = critic_obs.clone().detach()
                     next_critic_obs[termination_ids] = termination_privileged_obs.clone().detach()
-
+                    # 3. 将当前env_step完成后的数据 记录到  rollout 中
                     self.alg.process_env_step(rewards, dones, infos, next_critic_obs)
                 
                     if self.log_dir is not None:
                         # Book keeping
                         if 'episode' in infos:
                             ep_infos.append(infos['episode'])
-                        cur_reward_sum += rewards
+                        cur_reward_sum += rewards  # 当前env_step完成后更新的 对应env的 所有奖励之和 (num_envs,)
                         cur_episode_length += 1
                         new_ids = (dones > 0).nonzero(as_tuple=False)
                         rewbuffer.extend(cur_reward_sum[new_ids][:, 0].cpu().numpy().tolist())

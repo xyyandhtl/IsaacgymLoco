@@ -39,19 +39,19 @@ class HIMPPO:
     actor_critic: HIMActorCritic
     def __init__(self,
                  actor_critic,
-                 num_learning_epochs=1,
-                 num_mini_batches=1,
+                 num_learning_epochs=1,  # 5
+                 num_mini_batches=1,  # 4
                  clip_param=0.2,
-                 gamma=0.998,
+                 gamma=0.998,  # 0.99
                  lam=0.95,
                  value_loss_coef=1.0,
-                 entropy_coef=0.0,
+                 entropy_coef=0.0,  # 0.01
                  learning_rate=1e-3,
                  max_grad_norm=1.0,
                  use_clipped_value_loss=True,
-                 schedule="fixed",
+                 schedule="fixed",  # 'adaptive'
                  desired_kl=0.01,
-                 device='cpu',
+                 device='cpu',  # 'cuda:0'
                  ):
 
         self.device = device
@@ -88,9 +88,11 @@ class HIMPPO:
         self.actor_critic.train()
 
     def act(self, obs, critic_obs):
-        # Compute the actions and values
-        self.transition.actions = self.actor_critic.act(obs).detach()
-        self.transition.values = self.actor_critic.evaluate(critic_obs).detach()
+        # 1. 计算当前观测下的 actions、其对数概率、正态分布的均值和方差
+        # 2. 计算当前特权观测下的 价值
+        # 3. 并存储这些数据 到 transition buffer 中
+        self.transition.actions = self.actor_critic.act(obs).detach()  # (num_envs, 12)
+        self.transition.values = self.actor_critic.evaluate(critic_obs).detach()  # (num_envs, 1)
         self.transition.actions_log_prob = self.actor_critic.get_actions_log_prob(self.transition.actions).detach()
         self.transition.action_mean = self.actor_critic.action_mean.detach()
         self.transition.action_sigma = self.actor_critic.action_std.detach()
@@ -100,6 +102,7 @@ class HIMPPO:
         return self.transition.actions
     
     def process_env_step(self, rewards, dones, infos, next_critic_obs):
+        # 1. 存储执行actions后的新特权观测、奖励buffer、重置buffer 到 transition buffer 中
         self.transition.next_critic_observations = next_critic_obs.clone()
         self.transition.rewards = rewards.clone()
         self.transition.dones = dones
@@ -107,12 +110,15 @@ class HIMPPO:
         if 'time_outs' in infos:
             self.transition.rewards += self.gamma * torch.squeeze(self.transition.values * infos['time_outs'].unsqueeze(1).to(self.device), 1)
 
-        # Record the transition
+        # 2. 将当前 env_step 完成后的数据 记录到 rollout 中
         self.storage.add_transitions(self.transition)
         self.transition.clear()
+
+        # 3. 处理对应需要重置的env的actor和critic（pass）
         self.actor_critic.reset(dones)
     
     def compute_returns(self, last_critic_obs):
+        # 根据 执行当前env_step的actions后获取的新特权观测 计算 价值
         last_values= self.actor_critic.evaluate(last_critic_obs).detach()
         self.storage.compute_returns(last_values, self.gamma, self.lam)
 

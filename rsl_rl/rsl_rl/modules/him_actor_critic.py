@@ -74,7 +74,7 @@ class Normalization:
 class HIMActorCritic(nn.Module):
     is_recurrent = False
     def __init__(self, num_actor_obs,  # 45 * 6
-                 num_critic_obs,  # 45 * 6
+                 num_critic_obs,  # 45 + 3 + 3 + 187
                  num_one_step_obs,  # 45
                  num_actions,  # 12
                  actor_hidden_dims=[512, 256, 128],
@@ -165,6 +165,7 @@ class HIMActorCritic(nn.Module):
         return self.distribution.entropy().sum(dim=-1)
 
     def update_distribution(self, obs_history):
+        # 根据历史观测，计算policy输出的 actions正态分布的 均值，更新actions的 正态分布
         with torch.no_grad():
             vel, latent = self.estimator(obs_history)
         actor_input = torch.cat((obs_history[:, :self.num_one_step_obs], vel, latent), dim=-1)
@@ -172,13 +173,16 @@ class HIMActorCritic(nn.Module):
         self.distribution = Normal(mean, mean * 0. + self.std)
 
     def act(self, obs_history=None, **kwargs):
+        # 根据历史观测，更新actions的正态分布，并采样得到一个 actions
         self.update_distribution(obs_history)
         return self.distribution.sample()
     
     def get_actions_log_prob(self, actions):
-        return self.distribution.log_prob(actions).sum(dim=-1)
+        # 计算 给定actions 在当前policy输出的actions正态分布下的 对数概率
+        return self.distribution.log_prob(actions).sum(dim=-1)  # (num_envs, 12) ==> (num_envs, 1)
 
     def act_inference(self, obs_history, observations=None):
+        # 根据历史观测，计算policy输出的 actions正态分布的 均值，直接作为输出
         vel, latent = self.estimator(obs_history)
         actor_input = torch.cat((obs_history[:, :self.num_one_step_obs], vel, latent), dim=-1)
         mean = self.actor(actor_input)

@@ -152,24 +152,24 @@ class AlienGoRoughCfg(LeggedRobotCfg):
         randomize_motor_strength = True
         motor_strength_range = [0.9, 1.1]
 
-        randomize_kp = True
+        randomize_kp = True  # 是否 随机改变PD控制器的p增益（stiffness）
         kp_range = [0.9, 1.1]
 
-        randomize_kd = True
+        randomize_kd = True  # 是否 随机改变PD控制器的D增益（damping）
         kd_range = [0.9, 1.1]
 
         randomize_initial_joint_pos = True  # 是否随机化初始关节位置
         initial_joint_pos_range = [0.5, 1.5]
 
-        disturbance = True
-        disturbance_range = [-30.0, 30.0]
+        disturbance = True  # 是否给base施加一个随机的力
+        disturbance_range = [-30.0, 30.0]  # N
         disturbance_interval = 8
 
-        push_robots = True
-        push_interval_s = 16
-        max_push_vel_xy = 1.
+        push_robots = True  # 是否给base在水平方向施加一个速度
+        push_interval = 16  # step间隔
+        max_push_vel_xy = 1.  # 推动env的最大线速度 [1m/s]
 
-        delay = True
+        delay = True  # 是否延迟actions
 
     class rewards(LeggedRobotCfg.rewards):
         class scales:
@@ -202,6 +202,7 @@ class AlienGoRoughCfg(LeggedRobotCfg):
             hip_action_magnitude = -0.0  # action 中的 髋关节hip（0,3,6,9）动作幅度 惩罚（防止 > 1.0）
             thigh_pose = -0.05
             calf_pose = -0.05
+            # upward = 0.5  # 重力投影向下 奖励（0.5数量级为0.98）
             has_contact = 0.1  # 速度<0.1时 的 接触力 奖励
 
         only_positive_rewards = False   # 负奖励保留：为True时总奖励不低于零，避免早期训练频繁终止。复杂任务建议保持False
@@ -257,7 +258,6 @@ class AlienGoRoughCfgPPO( LeggedRobotCfgPPO ):
         value_loss_coef = 1.0
         use_clipped_value_loss = True
         clip_param = 0.2
-        entropy_coef = 0.01
         num_learning_epochs = 5
         num_mini_batches = 4  # mini batch size = num_envs*nsteps / nminibatches
         learning_rate = 1.e-3  # 5.e-4
