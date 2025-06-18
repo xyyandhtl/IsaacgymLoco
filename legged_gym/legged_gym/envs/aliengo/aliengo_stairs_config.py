@@ -161,7 +161,7 @@ class AlienGoStairsCfg(LeggedRobotCfg):
 
     class rewards(LeggedRobotCfg.rewards):
         class scales:
-            termination = -10.
+            termination = -50.
             tracking_lin_vel = 1.5
             tracking_ang_vel = 0.75
             lin_vel_z_up = -2.0
@@ -170,18 +170,18 @@ class AlienGoStairsCfg(LeggedRobotCfg):
             dof_acc = -2.5e-7
             joint_power = -2e-5
             base_height_up = -5.0
-            foot_clearance_base_up = -0.2
+            foot_clearance_base_up = -0.0
             foot_clearance_base_terrain = -0.0
             action_rate = -0.01
             smoothness = -0.0
             feet_air_time = 0.1
-            feet_mirror_up = -0.05  # 斜对称腿的关节位置偏差 惩罚
+            feet_mirror_up = -0.0
             collision_up = -1.0
-            feet_stumble_up = -0.05
+            feet_stumble_up = -0.2
             feet_slide_up = -0.01
-            feet_contact_forces = -0.00015  # 四足的接触力 > 100N 惩罚
-            stand_nice = -0.1  # commands 速度接近0（<0.1 m/s）且 重力投影向下时 的 关节位置与默认关节位置的 偏差 惩罚
-            torques = -0.0002
+            feet_contact_forces = -0.00015
+            stand_nice = -0.01
+            torques = -0.0001
             dof_vel = -0.0
             dof_pos_limits = -0.0
             dof_vel_limits = -0.0
@@ -265,9 +265,9 @@ class AlienGoStairsCfgPPO(LeggedRobotCfgPPO):
 
         # logging
         save_interval = 100  # check for potential saves every this many iterations
-        experiment_name = 'rough_aliengo'
+        experiment_name = 'stairs_aliengo'
         run_name = ''
         # load and resume
         resume = True
-        load_run = osp.join(logs_root, 'flat_aliengo', 'Jun17_10-45-18_flat')
+        load_run = osp.join(logs_root, 'flat_aliengo', 'Jun17_19-07-22_flat')
         checkpoint = -1  # -1 = last saved model
