@@ -46,15 +46,15 @@ class AlienGoStairsCfg(LeggedRobotCfg):
     class init_state(LeggedRobotCfg.init_state):
         pos = [0.0, 0.0, 0.55]  # x,y,z [m]
         default_joint_angles = {  # = target angles [rad] when action = 0.0
-            'FL_hip_joint': 0.0,  # [rad]
-            'RL_hip_joint': 0.0,  # [rad]
-            'FR_hip_joint': -0.0,  # [rad]
-            'RR_hip_joint': -0.0,  # [rad]
+            'FL_hip_joint': 0.1,  # [rad]
+            'RL_hip_joint': 0.1,  # [rad]
+            'FR_hip_joint': -0.1,  # [rad]
+            'RR_hip_joint': -0.1,  # [rad]
 
             'FL_thigh_joint': 0.8,  # [rad]
-            'RL_thigh_joint': 0.8,  # [rad]
+            'RL_thigh_joint': 1.0,  # [rad]
             'FR_thigh_joint': 0.8,  # [rad]
-            'RR_thigh_joint': 0.8,  # [rad]
+            'RR_thigh_joint': 1.0,  # [rad]
 
             'FL_calf_joint': -1.5,  # [rad]
             'RL_calf_joint': -1.5,  # [rad]
@@ -176,8 +176,8 @@ class AlienGoStairsCfg(LeggedRobotCfg):
             smoothness = -0.0
             feet_air_time = 0.1
             feet_mirror_up = -0.0
-            collision_up = -1.0
-            feet_stumble_up = -0.2
+            collision_up = -3.0
+            feet_stumble_up = -1.0
             feet_slide_up = -0.01
             feet_contact_forces = -0.00015
             stand_nice = -0.01
@@ -190,8 +190,8 @@ class AlienGoStairsCfg(LeggedRobotCfg):
             thigh_pose = -0.1
             calf_pose = -0.1
             stuck = -1.
-            # upward = 0.5  # 重力投影向下 奖励（0.5数量级为0.98）
-            has_contact = 0.1  # 速度<0.1时 的 接触力 奖励
+            # upward = 0.5
+            has_contact = 0.0
 
         only_positive_rewards = False  # if true negative total rewards are clipped at zero (avoids early termination problems)
         tracking_sigma = 0.25  # tracking reward = exp(-error^2/sigma)
