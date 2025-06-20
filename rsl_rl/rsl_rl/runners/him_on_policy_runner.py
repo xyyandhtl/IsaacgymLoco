@@ -146,6 +146,7 @@ class HIMOnPolicyRunner:
             mean_value_loss, mean_surrogate_loss, mean_estimation_loss, mean_swap_loss = self.alg.update()
             stop = time.time()
             learn_time = stop - start
+
             if self.log_dir is not None:
                 self.log(locals())
             if it % self.save_interval == 0:
@@ -225,9 +226,8 @@ class HIMOnPolicyRunner:
         log_string += (f"""{'-' * width}\n"""
                        f"""{'Total timesteps:':>{pad}} {self.tot_timesteps}\n"""
                        f"""{'Iteration time:':>{pad}} {iteration_time:.2f}s\n"""
-                       f"""{'Total time:':>{pad}} {self.tot_time:.2f}s\n"""
-                       f"""{'ETA:':>{pad}} {format_time(self.tot_time / (locs['it'] + 1) * (
-                               locs['num_learning_iterations'] - locs['it']))}\n""")
+                       f"""{'Total time:':>{pad}} {format_time(self.tot_time)}\n"""
+                       f"""{'ETA:':>{pad}} {format_time((self.tot_time / (locs['it'] + 1 - self.current_learning_iteration)) * (self.current_learning_iteration + locs['num_learning_iterations'] - locs['it']))}\n""")
         print(log_string)
 
     def save(self, path, infos=None):
@@ -256,19 +256,8 @@ class HIMOnPolicyRunner:
 
 
 def format_time(seconds):
-    days = int(seconds // (24 * 3600))
-    hours = int((seconds % (24 * 3600)) // 3600)
+    hours = int(seconds // 3600)
     minutes = int((seconds % 3600) // 60)
     seconds = int(seconds % 60)
 
-    time_parts = []
-    if days > 0:
-        time_parts.append(f"{days} ds ")
-    if hours > 0:
-        time_parts.append(f"{hours} hs ")
-    if minutes > 0:
-        time_parts.append(f"{minutes} ms ")
-    if seconds > 0 or not time_parts:
-        time_parts.append(f"{seconds} s")
-
-    return "".join(time_parts)
+    return f"{hours:02d}:{minutes:02d}:{seconds:02d}"

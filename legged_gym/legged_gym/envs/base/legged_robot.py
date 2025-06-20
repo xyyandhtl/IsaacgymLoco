@@ -563,11 +563,11 @@ class LeggedRobot(BaseTask):
         if self.cfg.terrain.measure_heights:
             self.measured_heights = self._get_heights()
 
-        # 4. 每16个 contorl步，给base在水平方向施加一个速度
+        # 4. 每16/0.02s个 env_step，给base在水平方向施加一个速度
         if self.cfg.domain_rand.push_robots and  (self.common_step_counter % self.cfg.domain_rand.push_interval == 0):
             self._push_robots()
 
-        # 5. 每8个 contorl步，给base施加一个随机的力
+        # 5. 每8个 env_step，给base施加一个随机的力
         if self.cfg.domain_rand.disturbance and (self.common_step_counter % self.cfg.domain_rand.disturbance_interval == 0):
             self._disturbance_robots()
 
@@ -971,6 +971,7 @@ class LeggedRobot(BaseTask):
         self.num_bodies = len(body_names)
         self.num_dofs = len(self.dof_names)
         feet_names = [s for s in body_names if self.cfg.asset.foot_name in s]
+
         penalized_contact_names = []
         for name in self.cfg.asset.penalize_contacts_on:
             penalized_contact_names.extend([s for s in body_names if name in s])
@@ -1287,7 +1288,7 @@ class LeggedRobot(BaseTask):
         return 1 - self.projected_gravity[:, 2]
 
     def _reward_has_contact(self):
-        # 奖励 速度<0.1时 的 接触力
+        # 奖励 速度<0.1时 的 四足接触力
         contact_filt = 1. * self.contact_filt
         return (torch.norm(self.commands[:, :2], dim=1) < 0.1) * torch.sum(contact_filt, dim=-1) / 4
 
