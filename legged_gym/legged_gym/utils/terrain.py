@@ -128,7 +128,7 @@ class Terrain:
             return step_height
         step_height = calculate_step_height(difficulty)
 
-        discrete_obstacles_height = 0.05 + difficulty * 0.1
+        discrete_obstacles_height = 0.05 + difficulty * 0.2
         stepping_stones_size = 1.5 * (1.05 - difficulty)
         stone_distance = 0.05 if difficulty==0 else 0.1
         gap_size = 1. * difficulty
@@ -186,9 +186,9 @@ class Terrain:
             terrain_utils.discrete_obstacles_terrain(terrain, discrete_obstacles_height, rectangle_min_size, rectangle_max_size, num_rectangles, platform_size=3.)
         elif choice < self.proportions[7]:  # 跳跃石地形
             terrain_utils.stepping_stones_terrain(terrain, stone_size=stepping_stones_size, stone_distance=stone_distance, max_height=0.8, platform_size=4.)
-        elif choice < self.proportions[8]:  # 坑洞地形
+        elif choice < self.proportions[8]:  # 坑
             pit_terrain(terrain, depth=pit_depth, platform_size=4.)
-        else:  # 间隙地形
+        else:  # 间隙
             gap_terrain(terrain, gap_size=gap_size, platform_size=3.)
         
         return terrain

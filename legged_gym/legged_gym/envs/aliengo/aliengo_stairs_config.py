@@ -73,7 +73,7 @@ class AlienGoStairsCfg(AlienGoRoughCfg):
         num_rows = 10  # number of terrain rows (levels)
         num_cols = 20  # number of terrain cols (types)
         # terrain types: [flat, rough, smooth_slope, rough_slope, stairs_up, stairs_down, discrete_obstacles, stepping_stones, pit, gap]
-        terrain_proportions = [0.0, 0.0, 0.1, 0.1, 0.5, 0.3, 0.0, 0.0, 0.0, 0.0]
+        terrain_proportions = [0.0, 0.0, 0.1, 0.0, 0.4, 0.3, 0.2, 0.0, 0.0, 0.0]
         # trimesh only:
         slope_treshold = 0.75  # slopes above this threshold will be corrected to vertical surfaces
 
