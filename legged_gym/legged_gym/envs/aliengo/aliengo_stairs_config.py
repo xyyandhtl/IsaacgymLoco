@@ -268,5 +268,5 @@ class AlienGoStairsCfgPPO(LeggedRobotCfgPPO):
         run_name = ''
         # load and resume
         resume = True
-        load_run = osp.join(logs_root, 'flat_aliengo', 'Jun17_19-07-22_flat')
+        load_run = osp.join(logs_root, 'rough_aliengo', 'Jun19_14-58-54_flat_init')
         checkpoint = -1  # -1 = last saved model

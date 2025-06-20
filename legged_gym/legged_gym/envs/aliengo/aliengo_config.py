@@ -44,17 +44,20 @@ class AlienGoRoughCfg(LeggedRobotCfg):
 
     class init_state(LeggedRobotCfg.init_state):
         pos = [0.0, 0.0, 0.55]   # 初始位置（x,y,z）单位：米
+        rot = [0.0, 0.0, 0.0, 1.0]  # x,y,z,w [quat]
+        lin_vel = [0.0, 0.0, 0.0]  # x,y,z [m/s]
+        ang_vel = [0.0, 0.0, 0.0]  # x,y,z [rad/s]
         default_joint_angles = { # action = 0.0，即零动作时的目标关节角度（站立姿态）
             # 髋关节
-            'FL_hip_joint': 0.0,   # [rad]
-            'RL_hip_joint': 0.0,   # [rad]
-            'FR_hip_joint': -0.0,   # [rad]
-            'RR_hip_joint': -0.0,   # [rad]
+            'FL_hip_joint': 0.1,   # [rad]
+            'RL_hip_joint': 0.1,   # [rad]
+            'FR_hip_joint': -0.1,   # [rad]
+            'RR_hip_joint': -0.1,   # [rad]
             # 大腿关节
             'FL_thigh_joint': 0.8,   # [rad]
-            'RL_thigh_joint': 0.8,   # [rad]
+            'RL_thigh_joint': 1.0,   # [rad]
             'FR_thigh_joint': 0.8,   # [rad]
-            'RR_thigh_joint': 0.8,   # [rad]
+            'RR_thigh_joint': 1.0,   # [rad]
             # 小腿关节（负值表示伸展）
             'FL_calf_joint': -1.5,   # [rad]
             'RL_calf_joint': -1.5,   # [rad]
@@ -166,7 +169,7 @@ class AlienGoRoughCfg(LeggedRobotCfg):
         disturbance_interval = 8
 
         push_robots = True  # 是否给base在水平方向施加一个速度
-        push_interval = 16  # step间隔
+        push_interval_s = 16  # step间隔 [s]
         max_push_vel_xy = 1.  # 推动env的最大线速度 [1m/s]
 
         delay = True  # 是否延迟actions
@@ -275,7 +278,7 @@ class AlienGoRoughCfgPPO( LeggedRobotCfgPPO ):
 
         # logging
         save_interval = 100  # check for potential saves every this many iterations
-        experiment_name = 'flat_aliengo'
+        experiment_name = 'rough_aliengo'
         run_name = ''
         # load and resume
         resume = False
