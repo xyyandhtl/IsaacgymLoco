@@ -30,11 +30,10 @@
 from os import path as osp
 from legged_gym.envs.aliengo.aliengo_config import AlienGoRoughCfg, AlienGoRoughCfgPPO
 
+class AlienGoStairsCfg( AlienGoRoughCfg ):
 
-class AlienGoStairsCfg(AlienGoRoughCfg):
-
-    class init_state(AlienGoRoughCfg.init_state):
-        pos = [0.0, 0.0, 0.55]  # x,y,z [m]
+    class init_state( AlienGoRoughCfg.init_state ):
+        pos = [0.0, 0.0, 0.50]  # x,y,z [m]
         default_joint_angles = {  # = target angles [rad] when action = 0.0
             'FL_hip_joint': 0.1,  # [rad]
             'RL_hip_joint': 0.1,  # [rad]
@@ -52,7 +51,7 @@ class AlienGoStairsCfg(AlienGoRoughCfg):
             'RR_calf_joint': -1.5,  # [rad]
         }
 
-    class terrain(AlienGoRoughCfg.terrain):
+    class terrain( AlienGoRoughCfg.terrain ):
         mesh_type = 'trimesh'  # "heightfield" # none, plane, heightfield or trimesh
         horizontal_scale = 0.1  # [m]
         vertical_scale = 0.005  # [m]
@@ -79,12 +78,14 @@ class AlienGoStairsCfg(AlienGoRoughCfg):
 
     class commands( AlienGoRoughCfg.commands ):
         curriculum = True
-        max_curriculum = 2.0
+        max_forward_curriculum = 1.5
+        max_backward_curriculum = 1.0
+        max_lat_curriculum = 1.0
         num_commands = 4 # default: lin_vel_x, lin_vel_y, ang_vel_yaw, heading (in heading mode ang_vel_yaw is recomputed from heading error)
         resampling_time = 10. # time before command are changed[s]
         heading_command = True # if true: compute ang vel command from heading error
 
-        class ranges( AlienGoRoughCfg.commands.ranges):
+        class ranges( AlienGoRoughCfg.commands.ranges ):
             lin_vel_x = [-1.0, 1.0]  # min max [m/s]
             lin_vel_y = [-0.5, 0.5]  # min max [m/s]
             ang_vel_yaw = [-1.0, 1.0]  # min max [rad/s]
@@ -128,28 +129,28 @@ class AlienGoStairsCfg(AlienGoRoughCfg):
 
         delay = True
 
-    class rewards(AlienGoRoughCfg.rewards):
+    class rewards( AlienGoRoughCfg.rewards ):
         class scales:
             termination = -50.
             tracking_lin_vel = 1.5
             tracking_ang_vel = 0.75
-            lin_vel_z_up = -2.0
-            ang_vel_xy_up = -0.05
-            orientation_up = -0.2
+            lin_vel_z = -2.0
+            ang_vel_xy = -0.05
+            orientation = -0.2
             dof_acc = -2.5e-7
             joint_power = -2e-5
-            base_height_up = -5.0
-            foot_clearance_base_up = -0.0
+            base_height = -5.0
+            foot_clearance_base = -0.0
             foot_clearance_base_terrain = -0.0
             action_rate = -0.01
             smoothness = -0.0
             feet_air_time = 0.1
-            feet_mirror_up = -0.0
-            collision_up = -3.0
-            feet_stumble_up = -1.0
-            feet_slide_up = -0.01
+            feet_mirror = -0.0
+            collision = -3.0
+            feet_stumble = -1.0
+            feet_slide = -0.01
             feet_contact_forces = -0.00015
-            stand_nice = -0.01
+            stand_still = -0.01
             torques = -0.0001
             dof_vel = -0.0
             dof_pos_limits = -0.0
@@ -159,7 +160,7 @@ class AlienGoStairsCfg(AlienGoRoughCfg):
             thigh_pose = -0.1
             calf_pose = -0.1
             stuck = -1.
-            # upward = 0.5
+            upward = 0.0
             has_contact = 0.0
 
         only_positive_rewards = False  # if true negative total rewards are clipped at zero (avoids early termination problems)
@@ -174,9 +175,9 @@ class AlienGoStairsCfg(AlienGoRoughCfg):
 
 
 logs_root = osp.join(osp.dirname(osp.dirname(osp.dirname(osp.dirname(osp.abspath(__file__))))), "logs")
-class AlienGoStairsCfgPPO(AlienGoRoughCfgPPO):
+class AlienGoStairsCfgPPO( AlienGoRoughCfgPPO ):
 
-    class runner(AlienGoRoughCfgPPO.runner):
+    class runner( AlienGoRoughCfgPPO.runner ):
         policy_class_name = 'HIMActorCritic'
         algorithm_class_name = 'HIMPPO'
         num_steps_per_env = 100  # per iteration

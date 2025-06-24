@@ -238,20 +238,22 @@ class LeggedRobot(BaseTask):
     def check_termination(self):
         """ Check if environments need to be reset
         """
-        # 触发终止部位的接触力 > 1N，则需要重置 (num_envs,)
-        self.reset_buf = torch.any(torch.norm(self.contact_forces[:, self.termination_contact_indices, :], dim=-1) > 1., dim=1)
-        # episode步数 > 1000
+        # termination_counts = {}
+        # (1) 触发终止部位的接触力 > 1N，则需要重置 (num_envs,)
+        contact_force_cond = torch.any(torch.norm(self.contact_forces[:, self.termination_contact_indices, :], dim=-1) > 1., dim=1)
+        self.reset_buf = contact_force_cond
+        # termination_counts["contact_force"] = (contact_force_cond.sum().item() / self.num_envs) * 100
+
+        # (2) episode步数 > 1000
         self.time_out_buf = self.episode_length_buf > self.max_episode_length # no terminal reward for time-outs
         self.reset_buf |= self.time_out_buf
-        # TODO 增加 base速度 与 命令速度
-        # vel_error = self.base_lin_vel[:, 0] - self.commands[:, 0]
-        # self.vel_violate = ((vel_error > 1.5) & (self.commands[:, 0] < 0.)) | ((vel_error < -1.5) & (self.commands[:, 0] > 0.))
-        # self.vel_violate *= (self.terrain_levels > 3)
-        # self.reset_buf |= self.vel_violate
+        # termination_counts["time_out"] = (self.time_out_buf.sum().item() / self.num_envs) * 100
 
         # TODO 增加 base的z方向线速度 < -3 （即跌落） 或 重力投影 为 Z轴正方向
         self.fall = (self.root_states[:, 9] < -3.) | (self.projected_gravity[:, 2] > 0.)
         self.reset_buf |= self.fall
+        # termination_counts["fall"] = (self.fall.sum().item() / self.num_envs) * 100
+        # print(f"[legged_robot] termination_counts (%): {termination_counts}]")
 
     def reset_idx(self, env_ids):
         """ Reset some environments.
@@ -345,10 +347,10 @@ class LeggedRobot(BaseTask):
         """ Computes observations
         """
         current_obs = torch.cat((   self.commands[:, :3] * self.commands_scale,  # * [2, 2, 0.25]
-                                    self.base_ang_vel  * self.obs_scales.ang_vel,
+                                    self.base_ang_vel  * self.obs_scales.ang_vel,  # 0.25
                                     self.projected_gravity,
-                                    (self.dof_pos - self.default_dof_pos) * self.obs_scales.dof_pos,
-                                    self.dof_vel * self.obs_scales.dof_vel,
+                                    (self.dof_pos - self.default_dof_pos) * self.obs_scales.dof_pos,  # 1.0
+                                    self.dof_vel * self.obs_scales.dof_vel,  # 0.05
                                     self.actions
                                     ),dim=-1)
         # add noise if needed
@@ -356,7 +358,7 @@ class LeggedRobot(BaseTask):
             current_obs += (2 * torch.rand_like(current_obs) - 1) * self.noise_scale_vec[0:(9 + 3 * self.num_actions)]
 
         # add perceptive inputs if not blind
-        current_obs = torch.cat((current_obs, self.base_lin_vel * self.obs_scales.lin_vel, self.disturbance[:, 0, :]), dim=-1)
+        current_obs = torch.cat((current_obs, self.base_lin_vel * self.obs_scales.lin_vel, self.disturbance[:, 0, :]), dim=-1)  # 2.0
         if self.cfg.terrain.measure_heights:
             heights = torch.clip(self.root_states[:, 2].unsqueeze(1) - 0.5 - self.measured_heights, -1, 1.) * self.obs_scales.height_measurements 
             heights += (2 * torch.rand_like(heights) - 1) * self.noise_scale_vec[(9 + 3 * self.num_actions):(9 + 3 * self.num_actions+187)]
@@ -707,14 +709,13 @@ class LeggedRobot(BaseTask):
         Args:
             env_ids (List[int]): ids of environments being reset
         """
-        low_vel_env_ids = (env_ids > (self.num_envs * 0.2))
-        high_vel_env_ids = (env_ids < (self.num_envs * 0.2))
-        low_vel_env_ids = env_ids[low_vel_env_ids.nonzero(as_tuple=True)]
-        high_vel_env_ids = env_ids[high_vel_env_ids.nonzero(as_tuple=True)]
         # If the tracking reward is above 80% of the maximum, increase the range of commands
-        if (torch.mean(self.episode_sums["tracking_lin_vel"][low_vel_env_ids]) / self.max_episode_length > 0.8 * self.reward_scales["tracking_lin_vel"]) and (torch.mean(self.episode_sums["tracking_lin_vel"][high_vel_env_ids]) / self.max_episode_length > 0.8 * self.reward_scales["tracking_lin_vel"]):
-            self.command_ranges["lin_vel_x"][0] = np.clip(self.command_ranges["lin_vel_x"][0] - 0.2, -self.cfg.commands.max_curriculum, 0.)
-            self.command_ranges["lin_vel_x"][1] = np.clip(self.command_ranges["lin_vel_x"][1] + 0.2, 0., self.cfg.commands.max_curriculum)
+        if (torch.mean(self.episode_sums["tracking_lin_vel"][env_ids]) / self.max_episode_length > 0.8 * self.reward_scales["tracking_lin_vel"]):
+            # [-2, 2] ==> [-1.0, 1.5]
+            self.command_ranges["lin_vel_x"][0] = np.clip(self.command_ranges["lin_vel_x"][0] - 0.1, -self.cfg.commands.max_backward_curriculum, 0.)
+            self.command_ranges["lin_vel_x"][1] = np.clip(self.command_ranges["lin_vel_x"][1] + 0.1, 0., self.cfg.commands.max_forward_curriculum)
+            self.command_ranges["lin_vel_y"][0] = np.clip(self.command_ranges["lin_vel_y"][0] - 0.1, -self.cfg.commands.max_lat_curriculum, 0.)
+            self.command_ranges["lin_vel_y"][1] = np.clip(self.command_ranges["lin_vel_y"][1] + 0.1, 0., self.cfg.commands.max_lat_curriculum)
 
 
     def _get_noise_scale_vec(self, cfg):
@@ -1034,7 +1035,6 @@ class LeggedRobot(BaseTask):
         self.termination_contact_indices = torch.zeros(len(termination_contact_names), dtype=torch.long, device=self.device, requires_grad=False)
         for i in range(len(termination_contact_names)):
             self.termination_contact_indices[i] = self.gym.find_actor_rigid_body_handle(self.envs[0], self.actor_handles[0], termination_contact_names[i])
-            
 
     def _get_env_origins(self):
         """ Sets environment origins. On rough terrain the origins are defined by the terrain platforms.
