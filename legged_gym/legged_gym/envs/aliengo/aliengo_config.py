@@ -139,22 +139,25 @@ class AlienGoRoughCfg( LeggedRobotCfg ):
         thickness = 0.01
 
     class domain_rand:
-        randomize_payload_mass = True
+        # startup
+        randomize_payload_mass = True  # 是否随机改变 base的质量（默认质量 ±）
         payload_mass_range = [-1, 2]
 
-        randomize_com_displacement = True  # 是否随机改变base的位置偏移
+        randomize_com_displacement = True  # 是否随机改变 base的质心偏移（xyz）
         com_displacement_range = [-0.05, 0.05]
 
-        randomize_link_mass = False
+        randomize_link_mass = False  # 是否随机更改env各刚体部位（除了base）的质量（默认质量 *）
         link_mass_range = [0.9, 1.1]
 
-        randomize_friction = True  # 是否随机化摩擦系数
+        # startup and reset
+        randomize_friction = True  # 是否随机化env各刚体部位的 摩擦系数
         friction_range = [0.2, 1.25]
 
-        randomize_restitution = False
+        randomize_restitution = False  # 是否随机化env各刚体部位的 弹性系数
         restitution_range = [0., 1.0]
 
-        randomize_motor_strength = True
+        # reset
+        randomize_motor_strength = True  # 是否随机化env的电机强度（好像也暂时未启作用）
         motor_strength_range = [0.9, 1.1]
 
         randomize_kp = True  # 是否 随机改变PD控制器的p增益（stiffness）
@@ -163,18 +166,19 @@ class AlienGoRoughCfg( LeggedRobotCfg ):
         randomize_kd = True  # 是否 随机改变PD控制器的D增益（damping）
         kd_range = [0.9, 1.1]
 
-        randomize_initial_joint_pos = True  # 是否随机化初始关节位置
+        randomize_initial_joint_pos = True  # 是否随机化初始关节位置（暂时未启作用）
         initial_joint_pos_range = [0.5, 1.5]
 
-        disturbance = True  # 是否给base施加一个随机的力
+        # interval
+        disturbance = True  # 是否给base施加一个随机扰动力（xyz方向）
         disturbance_range = [-30.0, 30.0]  # N
         disturbance_interval = 8
 
-        push_robots = True  # 是否给base在水平方向施加一个速度
+        push_robots = True  # 是否给base在水平方向施加一个线速度
         push_interval_s = 16  # step间隔 [s]
-        max_push_vel_xy = 1.  # 推动env的最大线速度 [1m/s]
+        max_push_vel_xy = 1.  # 施加的最大线速度 [1m/s]
 
-        delay = True  # 是否延迟actions
+        delay = True  # actions是否随机延迟一个 policy_dt
 
     class rewards( LeggedRobotCfg.rewards ):
         class scales:

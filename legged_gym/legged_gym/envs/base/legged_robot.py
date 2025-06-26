@@ -272,16 +272,16 @@ class LeggedRobot(BaseTask):
         if self.cfg.terrain.curriculum:
             self._update_terrain_curriculum(env_ids)
 
-        # 2. 更新命令课程（调整速度命令范围）
-        # 避免每步都更新，因为最大命令对所有环境是共享的
+        # 2. 更新 commands 课程（调整速度命令范围）
+        # 避免每步都更新，因为最大命令对所有env是共享的
         if self.cfg.commands.curriculum and (self.common_step_counter % self.max_episode_length == 0):
             self.update_command_curriculum(env_ids)
         
-        # 使用默认方式初始化状态
+        # 重置关节、base状态
         self._reset_dofs(env_ids)
         self._reset_root_states(env_ids)
 
-        # 4. 为重置的 env 重新采样 运动 commands
+        # 4. 为重置的 env 重新采样 commands
         self._resample_commands(env_ids)
 
         # 6. 重置各种缓冲区
@@ -297,13 +297,14 @@ class LeggedRobot(BaseTask):
         if self.cfg.terrain.measure_heights:
             self.measured_heights = self._get_heights()
         
-         #reset randomized prop
+         # 重新获取 域随机化 数据
         if self.cfg.domain_rand.randomize_kp:
             self.Kp_factors[env_ids] = torch_rand_float(self.cfg.domain_rand.kp_range[0], self.cfg.domain_rand.kp_range[1], (len(env_ids), 1), device=self.device)
         if self.cfg.domain_rand.randomize_kd:
             self.Kd_factors[env_ids] = torch_rand_float(self.cfg.domain_rand.kd_range[0], self.cfg.domain_rand.kd_range[1], (len(env_ids), 1), device=self.device)
         if self.cfg.domain_rand.randomize_motor_strength:
             self.motor_strength_factors[env_ids] = torch_rand_float(self.cfg.domain_rand.motor_strength_range[0], self.cfg.domain_rand.motor_strength_range[1], (len(env_ids), 1), device=self.device)
+        # 重新获取 env的摩擦系数、弹性系数，并设置给env的各部位
         self.refresh_actor_rigid_shape_props(env_ids)
         
         # 记录episode信息
@@ -358,7 +359,7 @@ class LeggedRobot(BaseTask):
             current_obs += (2 * torch.rand_like(current_obs) - 1) * self.noise_scale_vec[0:(9 + 3 * self.num_actions)]
 
         # add perceptive inputs if not blind
-        current_obs = torch.cat((current_obs, self.base_lin_vel * self.obs_scales.lin_vel, self.disturbance[:, 0, :]), dim=-1)  # 2.0
+        current_obs = torch.cat((current_obs, self.base_lin_vel * self.obs_scales.lin_vel, self.disturbance[:, 0, :]), dim=-1)  # base线速度 * 2.0, 给base施加的随机扰动力(xyz方向)
         if self.cfg.terrain.measure_heights:
             heights = torch.clip(self.root_states[:, 2].unsqueeze(1) - 0.5 - self.measured_heights, -1, 1.) * self.obs_scales.height_measurements 
             heights += (2 * torch.rand_like(heights) - 1) * self.noise_scale_vec[(9 + 3 * self.num_actions):(9 + 3 * self.num_actions+187)]
@@ -453,15 +454,18 @@ class LeggedRobot(BaseTask):
         Returns:
             [List[gymapi.RigidShapeProperties]]: Modified rigid shape properties
         """
+        # 为每个env生成一个随机摩擦系数，并将同一个env的所有刚体部位的摩擦系数 都设置为相同的数值
         if self.cfg.domain_rand.randomize_friction:
             if env_id==0:
                 # prepare friction randomization
                 friction_range = self.cfg.domain_rand.friction_range
+                # 为每个env生成一个随机摩擦数 (num_env, 1)
                 self.friction_coeffs = torch_rand_float(friction_range[0], friction_range[1], (self.num_envs,1), device=self.device)
 
             for s in range(len(props)):
                 props[s].friction = self.friction_coeffs[env_id]
 
+        # 为每个env生成一个随机弹性系数，并将同一个env的所有刚体部位的弹性系数 都设置为相同的数值
         if self.cfg.domain_rand.randomize_restitution:
             if env_id==0:
                 # prepare restitution randomization
@@ -531,13 +535,15 @@ class LeggedRobot(BaseTask):
         #         print(f"Mass of body {i}: {p.mass} (before randomization)")
         #     print(f"Total mass {sum} (before randomization)")
         # randomize base mass
+        # 随机更改base的质量
         if self.cfg.domain_rand.randomize_payload_mass:
             props[0].mass = self.default_rigid_body_mass[0] + self.payload[env_id, 0]
 
-        # 随机放置env
+        # 随机更改base的质心
         if self.cfg.domain_rand.randomize_com_displacement:
             props[0].com = gymapi.Vec3(self.com_displacement[env_id, 0], self.com_displacement[env_id, 1], self.com_displacement[env_id, 2])
 
+        # 随机更改env各刚体部位（除了base）的质量
         if self.cfg.domain_rand.randomize_link_mass:
             rng = self.cfg.domain_rand.link_mass_range
             for i in range(1, len(props)):
@@ -669,7 +675,7 @@ class LeggedRobot(BaseTask):
         """ Random pushes the robots. Emulates an impulse by setting a randomized base velocity. (瞬时的)
         """
         max_vel = self.cfg.domain_rand.max_push_vel_xy  # 获取推动env的最大线速度 [1m/s]
-        # 给 base 在x/y线速度方向上添加随机推力
+        # 给 base 的xy方向线速度 上再添加随机 速度
         self.root_states[:, 7:9] = torch_rand_float(-max_vel, max_vel, (self.num_envs, 2), device=self.device) # lin vel x/y
         self.gym.set_actor_root_state_tensor(self.sim, gymtorch.unwrap_tensor(self.root_states))
 
@@ -962,6 +968,7 @@ class LeggedRobot(BaseTask):
         self.num_dof = self.gym.get_asset_dof_count(robot_asset)
         self.num_bodies = self.gym.get_asset_rigid_body_count(robot_asset)
         dof_props_asset = self.gym.get_asset_dof_properties(robot_asset)
+        # 包含刚体属性的列表，即包含机器狗的每个部位，[0]通常表示base
         rigid_shape_props_asset = self.gym.get_asset_rigid_shape_properties(robot_asset)
 
         # save body names from the asset
@@ -987,7 +994,7 @@ class LeggedRobot(BaseTask):
         start_pose = gymapi.Transform()
         start_pose.p = gymapi.Vec3(*self.base_init_state[:3])
 
-        self._get_env_origins()
+        self._get_env_origins() # 获取每个env初始化时在地形中的位置 = 对应子地形的中心位置 (num_envs, 3)
         env_lower = gymapi.Vec3(0., 0., 0.)
         env_upper = gymapi.Vec3(0., 0., 0.)
         self.actor_handles = []
@@ -996,29 +1003,36 @@ class LeggedRobot(BaseTask):
         # for domain randomization
         self.payload = torch.zeros(self.num_envs, 1, dtype=torch.float, device=self.device, requires_grad=False)
         self.com_displacement = torch.zeros(self.num_envs, 3, dtype=torch.float, device=self.device, requires_grad=False)
+        # 获取给env的质量 加减的范围
         if self.cfg.domain_rand.randomize_payload_mass:
             self.payload = torch_rand_float(self.cfg.domain_rand.payload_mass_range[0], self.cfg.domain_rand.payload_mass_range[1], (self.num_envs, 1), device=self.device)
+        # 获取给base的 位置（xyz）加减的范围
         if self.cfg.domain_rand.randomize_com_displacement:
             self.com_displacement = torch_rand_float(self.cfg.domain_rand.com_displacement_range[0], self.cfg.domain_rand.com_displacement_range[1], (self.num_envs, 3), device=self.device)
-            
+
+        # 创建每一个env
         for i in range(self.num_envs):
             # create env instance
             env_handle = self.gym.create_env(self.sim, env_lower, env_upper, int(np.sqrt(self.num_envs)))
-            pos = self.env_origins[i].clone()
+            pos = self.env_origins[i].clone()  # 该env的初始位置
+            # (1) env初始位置随机 xy方向 随机加减1
             pos[:2] += torch_rand_float(-1., 1., (2,1), device=self.device).squeeze(1)
             start_pose.p = gymapi.Vec3(*pos)
-                
+
+            # (2) 为每个env生成一个随机摩擦系数、弹性系数
             rigid_shape_props = self._process_rigid_shape_props(rigid_shape_props_asset, i)
             self.gym.set_asset_rigid_shape_properties(robot_asset, rigid_shape_props)
             actor_handle = self.gym.create_actor(env_handle, robot_asset, start_pose, self.cfg.asset.name, i, self.cfg.asset.self_collisions, 0)
+            # (3) 计算关节的属性限制（位置、速度、力矩）
             dof_props = self._process_dof_props(dof_props_asset, i)
             self.gym.set_actor_dof_properties(env_handle, actor_handle, dof_props)
             body_props = self.gym.get_actor_rigid_body_properties(env_handle, actor_handle)
-            
+
+            # (4) 随机更改env的 base质量、质心偏移、其他刚体部位质量
             if i == 0:
                 for j in range(len(body_props)):
                     self.default_rigid_body_mass[j] = body_props[j].mass
-                    
+
             body_props = self._process_rigid_body_props(body_props, i)
             self.gym.set_actor_rigid_body_properties(env_handle, actor_handle, body_props, recomputeInertia=True)
             self.envs.append(env_handle)
@@ -1046,10 +1060,14 @@ class LeggedRobot(BaseTask):
             # put robots at the origins defined by the terrain
             max_init_level = self.cfg.terrain.max_init_terrain_level
             if not self.cfg.terrain.curriculum: max_init_level = self.cfg.terrain.num_rows - 1
+            # 在 [0, max_init_level + 1] 范围中随机生成每个env的 初始地形等级 (num_env,)
             self.terrain_levels = torch.randint(0, max_init_level+1, (self.num_envs,), device=self.device)
+            # env 平均分布在每列地形中 的编号 (num_envs / num_cols,)
             self.terrain_types = torch.div(torch.arange(self.num_envs, device=self.device), (self.num_envs/self.cfg.terrain.num_cols), rounding_mode='floor').to(torch.long)
             self.max_terrain_level = self.cfg.terrain.num_rows
+            # 各子地形的中心位置 (num_rows, num_cols, 3)
             self.terrain_origins = torch.from_numpy(self.terrain.env_origins).to(self.device).to(torch.float)
+            # 每个env初始化时在地形中的位置 = 对应子地形的中心位置 (num_envs, 3)
             self.env_origins[:] = self.terrain_origins[self.terrain_levels, self.terrain_types]
         else:
             self.custom_origins = False
