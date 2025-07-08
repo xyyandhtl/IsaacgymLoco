@@ -180,6 +180,8 @@ class AlienGoRoughCfg( LeggedRobotCfg ):
 
         delay = True  # actions是否随机延迟一个 policy_dt
 
+        recover_mode = False  # 是否开启摔倒恢复模式
+
     class rewards( LeggedRobotCfg.rewards ):
         class scales:
             termination = -0.0  # 仿真终止时的惩罚：未启用。设为负值（如-10.0）可在跌倒时给予额外惩罚

@@ -128,7 +128,7 @@ class Terrain:
             return step_height
         step_height = calculate_step_height(difficulty)
 
-        discrete_obstacles_height = 0.05 + difficulty * 0.2
+        discrete_obstacles_height = 0.05 + difficulty * 0.2  # [0.05, 0.07, ..., 0.23]
         stepping_stones_size = 1.5 * (1.05 - difficulty)
         stone_distance = 0.05 if difficulty==0 else 0.1
         gap_size = 1. * difficulty

@@ -47,6 +47,7 @@ from legged_gym.envs.base.base_task import BaseTask
 from legged_gym.utils.terrain import Terrain
 from legged_gym.utils.math import quat_apply_yaw, wrap_to_pi, torch_rand_sqrt_float
 from legged_gym.utils.helpers import class_to_dict
+from legged_gym.utils.math import random_quat
 from .legged_robot_config import LeggedRobotCfg
 
 class LeggedRobot(BaseTask):
@@ -249,8 +250,15 @@ class LeggedRobot(BaseTask):
         self.reset_buf |= self.time_out_buf
         # termination_counts["time_out"] = (self.time_out_buf.sum().item() / self.num_envs) * 100
 
-        # TODO 增加 base的z方向线速度 < -3 （即跌落） 或 重力投影 为 Z轴正方向
-        self.fall = (self.root_states[:, 9] < -3.) | (self.projected_gravity[:, 2] > 0.)
+        # (3) base速度 与 命令速度（因摔倒恢复训练，需关闭这个）
+        # vel_error = self.base_lin_vel[:, 0] - self.commands[:, 0]
+        # self.vel_violate = ((vel_error > 1.5) & (self.commands[:, 0] < 0.)) | ((vel_error < -1.5) & (self.commands[:, 0] > 0.))
+        # self.vel_violate *= (self.terrain_levels > 3)
+        # self.reset_buf |= self.vel_violate
+        # termination_counts["vel_violate"] = (self.vel_violate.sum().item() / self.num_envs) * 100
+
+        # (4) base的z方向线速度 < -5 （即跌落）# 或 重力投影 为 Z轴向上（因摔倒恢复训练，需关闭这个，避免刚重置就终止了）
+        self.fall = (self.root_states[:, 9] < -5.)  #  | (self.projected_gravity[:, 2] > 0.)
         self.reset_buf |= self.fall
         # termination_counts["fall"] = (self.fall.sum().item() / self.num_envs) * 100
         # print(f"[legged_robot] termination_counts (%): {termination_counts}]")
@@ -666,6 +674,13 @@ class LeggedRobot(BaseTask):
             self.root_states[env_ids, :3] += self.env_origins[env_ids]
         # base velocities
         self.root_states[env_ids, 7:13] = torch_rand_float(-0.5, 0.5, (len(env_ids), 6), device=self.device) # [7:10]: lin vel, [10:13]: ang vel
+
+        if self.cfg.domain_rand.recover_mode:
+            # random orientation
+            self.root_states[env_ids, 3:7] = random_quat(torch_rand_float(0, 1, (len(env_ids), 3), device=self.device))
+            # random height
+            self.root_states[env_ids, 2:3] += torch_rand_float(0, 0.1, (len(env_ids), 1), device=self.device)
+
         env_ids_int32 = env_ids.to(dtype=torch.int32)
         self.gym.set_actor_root_state_tensor_indexed(self.sim,
                                                      gymtorch.unwrap_tensor(self.root_states),
@@ -1463,12 +1478,12 @@ class LeggedRobot(BaseTask):
 
     def _reward_feet_mirror(self):
         # 惩罚 斜对称腿的关节位置偏差
-        diff1 = torch.sum(torch.square(self.dof_pos[:,[0,1,2]] - self.dof_pos[:,[9,10,11]]),dim=-1)
-        diff2 = torch.sum(torch.square(self.dof_pos[:,[3,4,5]] - self.dof_pos[:,[6,7,8]]),dim=-1)
+        diff1 = torch.sum(torch.square(self.dof_pos[:, [1, 2]] - self.dof_pos[:, [10, 11]]),dim=-1)
+        diff2 = torch.sum(torch.square(self.dof_pos[:, [4, 5]] - self.dof_pos[:, [7, 8]]),dim=-1)
         return 0.5 * (diff1 + diff2)
     def _reward_feet_mirror_up(self):
-        diff1 = torch.sum(torch.square(self.dof_pos[:,[0,1,2]] - self.dof_pos[:,[9,10,11]]),dim=-1)
-        diff2 = torch.sum(torch.square(self.dof_pos[:,[3,4,5]] - self.dof_pos[:,[6,7,8]]),dim=-1)
+        diff1 = torch.sum(torch.square(self.dof_pos[:, [1, 2]] - self.dof_pos[:, [10, 11]]),dim=-1)
+        diff2 = torch.sum(torch.square(self.dof_pos[:, [4, 5]] - self.dof_pos[:, [7, 8]]),dim=-1)
         return 0.5 * (diff1 + diff2) * torch.clamp(-self.projected_gravity[:, 2], 0, 1)
 
     # --- stand, stuck ---
@@ -1494,12 +1509,21 @@ class LeggedRobot(BaseTask):
     def _reward_hip_pos(self):
         # 惩罚 髋关节hip（0,3,6,9）与默认位置的偏差
         return torch.sum(torch.abs(self.dof_pos[:, [0,3,6,9]] - self.default_dof_pos[:, [0,3,6,9]]), dim=1)
+    def _reward_hip_pos_up(self):
+        return (torch.sum(torch.abs(self.dof_pos[:, [0, 3, 6, 9]] - self.default_dof_pos[:, [0, 3, 6, 9]]), dim=1)
+                * torch.clamp(-self.projected_gravity[:, 2], 0, 1))
 
     def _reward_thigh_pose(self):
         return torch.sum(torch.abs(self.dof_pos[:, [1,4,7,10]] - self.default_dof_pos[:, [1,4,7,10]]), dim=1)
+    def _reward_thigh_pose_up(self):
+        return (torch.sum(torch.abs(self.dof_pos[:, [1,4,7,10]] - self.default_dof_pos[:, [1,4,7,10]]), dim=1)
+                * torch.clamp(-self.projected_gravity[:, 2], 0, 1))
 
     def _reward_calf_pose(self):
         return torch.sum(torch.abs(self.dof_pos[:, [2,5,8,11]] - self.default_dof_pos[:, [2,5,8,11]]), dim=1)
+    def _reward_calf_pose_up(self):
+        return (torch.sum(torch.abs(self.dof_pos[:, [2,5,8,11]] - self.default_dof_pos[:, [2,5,8,11]]), dim=1)
+                * torch.clamp(-self.projected_gravity[:, 2], 0, 1))
 
     # --- 四足离地高度 ---
     def _reward_foot_clearance_base(self):

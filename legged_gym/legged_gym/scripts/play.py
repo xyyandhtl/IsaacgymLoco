@@ -42,11 +42,11 @@ import torch
 def play(args, x_vel=1.0, y_vel=0.0, yaw_vel=0.0):
     env_cfg, train_cfg = task_registry.get_cfgs(name=args.task)
     # override some parameters for testing
-    env_cfg.env.num_envs = min(env_cfg.env.num_envs, 250)
-    env_cfg.terrain.num_rows = 10
-    env_cfg.terrain.num_cols = 10
+    env_cfg.env.num_envs = min(env_cfg.env.num_envs, 100)
+    env_cfg.terrain.num_rows = 5
+    env_cfg.terrain.num_cols = 5
     # terrain type
-    env_cfg.terrain.curriculum = True  # True: use train terrain and curriculum
+    env_cfg.terrain.curriculum = False  # True: use train terrain and curriculum
                                        # False: use random terrain
     env_cfg.terrain.max_init_terrain_level = 5
     env_cfg.noise.add_noise = False
@@ -56,6 +56,8 @@ def play(args, x_vel=1.0, y_vel=0.0, yaw_vel=0.0):
     env_cfg.domain_rand.randomize_payload_mass = False
     env_cfg.commands.heading_command = False
     # env_cfg.terrain.mesh_type = 'plane'
+    env_cfg.asset.terminate_after_contacts_on = []
+
     # prepare environment
     env, _ = task_registry.make_env(name=args.task, args=args, env_cfg=env_cfg)
     env.commands[:, 0] = x_vel
@@ -87,7 +89,7 @@ def play(args, x_vel=1.0, y_vel=0.0, yaw_vel=0.0):
     camera_direction = np.array([25, 0, 3]) - np.array(env_cfg.viewer.pos)
     img_idx = 0
 
-    for i in range(10*int(env.max_episode_length)):
+    for i in range(10 * int(env.max_episode_length)):
     
         actions = policy(obs.detach())
         env.commands[:, 0] = x_vel

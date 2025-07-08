@@ -36,6 +36,7 @@ from .a1.a1_stairs_config import A1StairsCfg, A1StairsCfgPPO
 from legged_gym.envs.go1.go1_config import Go1RoughCfg, Go1RoughCfgPPO
 from legged_gym.envs.aliengo.aliengo_config import AlienGoRoughCfg, AlienGoRoughCfgPPO
 from legged_gym.envs.aliengo.aliengo_stairs_config import AlienGoStairsCfg, AlienGoStairsCfgPPO
+from legged_gym.envs.aliengo.aliengo_recover_config import AlienGoRoughRecoverCfg, AlienGoRoughRecoverCfgPPO
 
 import os
 
@@ -46,3 +47,4 @@ task_registry.register( "a1_stairs", LeggedRobot, A1StairsCfg(), A1StairsCfgPPO(
 task_registry.register( "go1", LeggedRobot, Go1RoughCfg(), Go1RoughCfgPPO() )
 task_registry.register( "aliengo", LeggedRobot, AlienGoRoughCfg(), AlienGoRoughCfgPPO() )
 task_registry.register( "aliengo_stairs", LeggedRobot, AlienGoStairsCfg(), AlienGoStairsCfgPPO() )
+task_registry.register( "aliengo_recover", LeggedRobot, AlienGoRoughRecoverCfg(), AlienGoRoughRecoverCfgPPO() )
