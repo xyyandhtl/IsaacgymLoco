@@ -78,7 +78,7 @@ class Terrain:
             (i, j) = np.unravel_index(k, (self.cfg.num_rows, self.cfg.num_cols))
 
             choice = np.random.uniform(0, 1)
-            difficulty = np.random.choice([0.5, 0.65, 0.8])
+            difficulty = np.random.choice([0.5, 0.7, 0.8])
             terrain = self.make_terrain(choice, difficulty)
             self.add_terrain_to_map(terrain, i, j)
         
@@ -120,15 +120,18 @@ class Terrain:
         amplitude = min(0.02 + 0.1 * difficulty, 0.06)  # [0.02, 0.03..., 0.06]
 
         def calculate_step_height(difficulty):
-            if difficulty < 0.6:
-                step_height = 0.06 + 0.18 * difficulty  # 0.06 + [0.0, 0.018, ..., 0.09]
+            # [0.06, 0.08, 0.10, 0.12, 0.14, 0.16, 0.16, 0.175, 0.19, 0.205]
+            if difficulty < 0.5:
+                step_height = 0.06 + 0.2 * difficulty
+            elif difficulty in [0.5, 0.6]:
+                step_height = 0.16
             else:
-                height_at_06 = 0.06 + 0.18 * 0.6  # 0.168
-                step_height = height_at_06 + 0.12 * (difficulty - 0.6)
+                height_at_06 = 0.16
+                step_height = height_at_06 + 0.15 * (difficulty - 0.6)
             return step_height
         step_height = calculate_step_height(difficulty)
 
-        discrete_obstacles_height = 0.05 + difficulty * 0.2  # [0.05, 0.07, ..., 0.23]
+        discrete_obstacles_height = 0.06 + difficulty * 0.15  # [0.06, 0.075, ..., 0.135, 0.15, ..., 0.195]
         stepping_stones_size = 1.5 * (1.05 - difficulty)
         stone_distance = 0.05 if difficulty==0 else 0.1
         gap_size = 1. * difficulty
