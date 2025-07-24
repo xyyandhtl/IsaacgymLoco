@@ -28,6 +28,13 @@
 #
 # Copyright (c) 2021 ETH Zurich, Nikita Rudin
 
+import sys
+from pathlib import Path
+LEGGED_GYM_ROOT_DIR = str(Path(__file__).resolve().parent.parent.parent)
+RSL_RL_ROOT_DIR = str(Path(__file__).resolve().parent.parent.parent.parent / 'rsl_rl')
+sys.path.append(LEGGED_GYM_ROOT_DIR)
+sys.path.append(RSL_RL_ROOT_DIR)
+
 from legged_gym import LEGGED_GYM_ROOT_DIR
 import os
 
@@ -138,4 +145,4 @@ if __name__ == '__main__':
     RECORD_FRAMES = False
     MOVE_CAMERA = False
     args = get_args()
-    play(args, x_vel=1.0, y_vel=0.0, yaw_vel=0.0)
+    play(args, x_vel=2.0, y_vel=0.0, yaw_vel=0.0)

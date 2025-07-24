@@ -138,7 +138,7 @@ class AlienGoStairsCfg( AlienGoRoughCfg ):
             ang_vel_xy = -0.05
             orientation = -0.2
             dof_acc = -2.5e-7
-            joint_power = -2e-5
+            joint_power = -6e-5
             base_height = -5.0
             foot_clearance_base = -0.0
             foot_clearance_base_terrain = -0.0
@@ -151,12 +151,12 @@ class AlienGoStairsCfg( AlienGoRoughCfg ):
             feet_slide = -0.01
             feet_contact_forces = -0.00015
             stand_still = -0.01
-            torques = -0.0001
+            torques = -0.0002
             dof_vel = -0.0
             dof_pos_limits = -0.0
             dof_vel_limits = -0.0
             torque_limits = -0.0
-            hip_pos = -0.1
+            hip_pos = -0.2
             thigh_pose = -0.1
             calf_pose = -0.1
             stuck = -1.
@@ -189,5 +189,5 @@ class AlienGoStairsCfgPPO( AlienGoRoughCfgPPO ):
         run_name = ''
         # load and resume
         resume = True
-        load_run = osp.join(logs_root, 'rough_aliengo', 'Jun19_14-58-54_flat_init')
+        load_run = osp.join(logs_root, 'stairs_aliengo', 'Jul11_13-47-20_')
         checkpoint = -1  # -1 = last saved model
