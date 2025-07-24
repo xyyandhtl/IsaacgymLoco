@@ -27,12 +27,13 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
 # Copyright (c) 2021 ETH Zurich, Nikita Rudin
+import math
 from os import path as osp
 from legged_gym.envs.aliengo.aliengo_config import AlienGoRoughCfg, AlienGoRoughCfgPPO
 
-class AlienGoRoughRecoverCfg(AlienGoRoughCfg):
+class AlienGoRoughRecoverCfg( AlienGoRoughCfg ):
 
-    class init_state(AlienGoRoughCfg.init_state):
+    class init_state( AlienGoRoughCfg.init_state ):
         pos = [0.0, 0.0, 0.50]  # x,y,z [m]
         default_joint_angles = {  # = target angles [rad] when action = 0.0
             'FL_hip_joint': 0.1,  # [rad]
@@ -72,24 +73,24 @@ class AlienGoRoughRecoverCfg(AlienGoRoughCfg):
         num_rows = 10  # number of terrain rows (levels)
         num_cols = 20  # number of terrain cols (types)
         # terrain types: [flat, rough, smooth_slope, rough_slope, stairs_up, stairs_down, discrete_obstacles, stepping_stones, pit, gap]
-        terrain_proportions = [0.3, 0.3, 0.2, 0.2]
+        terrain_proportions = [0.5, 0.5]
         # trimesh only:
         slope_treshold = 0.75  # slopes above this threshold will be corrected to vertical surfaces
 
     class commands( AlienGoRoughCfg.commands ):
         curriculum = True
-        max_forward_curriculum = 1.5
+        max_forward_curriculum = 2.0  # x_vel 限制 [-1.0, 1.5]
         max_backward_curriculum = 1.0
-        max_lat_curriculum = 1.0
+        max_lat_curriculum = 1.0  # y_vel 限制 [-1.0, 1.0]
         num_commands = 4 # default: lin_vel_x, lin_vel_y, ang_vel_yaw, heading (in heading mode ang_vel_yaw is recomputed from heading error)
         resampling_time = 10. # time before command are changed[s]
         heading_command = True # if true: compute ang vel command from heading error
 
-        class ranges( AlienGoRoughCfg.commands.ranges):
+        class ranges( AlienGoRoughCfg.commands.ranges ):
             lin_vel_x = [-1.0, 1.0]  # min max [m/s]
             lin_vel_y = [-0.5, 0.5]  # min max [m/s]
             ang_vel_yaw = [-1.0, 1.0]  # min max [rad/s]
-            heading = [-1.0, 1.0]
+            heading = [-math.pi, math.pi]
 
     class asset( AlienGoRoughCfg.asset ):
         penalize_contacts_on = ["thigh", "calf", "base"]
@@ -98,7 +99,7 @@ class AlienGoRoughRecoverCfg(AlienGoRoughCfg):
 
     class domain_rand:
         randomize_payload_mass = True
-        payload_mass_range = [-1, 2]
+        payload_mass_range = [0, 2]
 
         randomize_com_displacement = True
         com_displacement_range = [-0.05, 0.05]
@@ -136,24 +137,24 @@ class AlienGoRoughRecoverCfg(AlienGoRoughCfg):
 
         recover_mode = True
 
-    class rewards(AlienGoRoughCfg.rewards):
+    class rewards( AlienGoRoughCfg.rewards ):
         class scales:
             termination = -0.0
             tracking_lin_vel = 2.0
             tracking_ang_vel = 1.0
             lin_vel_z_up = -2.0
             ang_vel_xy_up = -0.05
-            orientation_up = -2.0  # base 非水平姿态 惩罚（摔倒恢复训练时减小）
+            orientation_up = -2.0  # base 非水平姿态 惩罚
             dof_acc = -2.5e-7
             joint_power = -2e-5
-            base_height_up = -10.0
-            foot_clearance_base_up = -0.5
+            base_height_up = -5.0
+            foot_clearance_base_up = -0.1
             foot_clearance_base_terrain = -0.0
             action_rate = -0.02
             smoothness = -0.01
             feet_air_time = 0.25
             feet_mirror_up = -0.05
-            collision_up = -0.01  # 摔倒恢复训练时可开启，随机旋转降落时惩罚加大
+            collision_up = -0.0
             feet_stumble_up = -0.0
             feet_slide_up = -0.01
             feet_contact_forces = -0.00015
@@ -163,13 +164,13 @@ class AlienGoRoughRecoverCfg(AlienGoRoughCfg):
             dof_pos_limits = -0.0
             dof_vel_limits = -0.0
             torque_limits = -0.0
-            hip_pos_up = -0.2
+            hip_pos_up = -0.3
             hip_action_magnitude = -0.01
             thigh_pose_up = -0.05
             calf_pose_up = -0.05
             stuck = -0.05
             upward = 0.5  # 摔倒恢复训练时可开启
-            has_contact = 0.5  # 摔倒恢复训练时可开启
+            has_contact = 0.3  # 摔倒恢复训练时可开启
 
         only_positive_rewards = True  # if true negative total rewards are clipped at zero (avoids early termination problems)
         tracking_sigma = 0.25  # tracking reward = exp(-error^2/sigma)
@@ -181,6 +182,16 @@ class AlienGoRoughRecoverCfg(AlienGoRoughCfg):
         foot_height_target_terrain = 0.15
         max_contact_force = 100.  # forces above this value are penalized
 
+    class normalization:
+        class obs_scales:
+            lin_vel = 2.0
+            ang_vel = 0.25
+            dof_pos = 1.0
+            dof_vel = 0.05
+            height_measurements = 5.0
+        clip_observations = 100.
+        clip_actions = 100.
+
 
 logs_root = osp.join(osp.dirname(osp.dirname(osp.dirname(osp.dirname(osp.abspath(__file__))))), "logs")
 class AlienGoRoughRecoverCfgPPO( AlienGoRoughCfgPPO ):
@@ -188,14 +199,14 @@ class AlienGoRoughRecoverCfgPPO( AlienGoRoughCfgPPO ):
     class runner( AlienGoRoughCfgPPO.runner ):
         policy_class_name = 'HIMActorCritic'
         algorithm_class_name = 'HIMPPO'
-        num_steps_per_env = 24  # per iteration
-        max_iterations = 5000  # number of policy updates
+        num_steps_per_env = 100  # per iteration
+        max_iterations = 2000  # number of policy updates
 
         # logging
         save_interval = 100  # check for potential saves every this many iterations
         experiment_name = 'recover_aliengo'
         run_name = ''
         # load and resume
-        resume = False
-        load_run = osp.join(logs_root, 'rough_aliengo', 'Jun19_14-58-54_flat_init')  # -1 = last run
+        resume = True
+        load_run = osp.join(logs_root, 'flat_aliengo', 'Jul23_11-53-29_init0.1')  # -1 = last run
         checkpoint = -1  # -1 = last saved model

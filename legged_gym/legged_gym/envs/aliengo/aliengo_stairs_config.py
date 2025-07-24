@@ -27,6 +27,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
 # Copyright (c) 2021 ETH Zurich, Nikita Rudin
+import math
 from os import path as osp
 from legged_gym.envs.base.legged_robot_config import USING_HYBRID
 
@@ -84,9 +85,9 @@ class AlienGoStairsCfg( AlienGoRoughCfg ):
 
     class commands( AlienGoRoughCfg.commands ):
         curriculum = True
-        max_forward_curriculum = 1.5
+        max_forward_curriculum = 1.5  # x_vel 限制 [-1.0, 1.5]
         max_backward_curriculum = 1.0
-        max_lat_curriculum = 1.0
+        max_lat_curriculum = 1.0  # y_vel 限制 [-1.0, 1.0]
         num_commands = 4 # default: lin_vel_x, lin_vel_y, ang_vel_yaw, heading (in heading mode ang_vel_yaw is recomputed from heading error)
         resampling_time = 10. # time before command are changed[s]
         heading_command = True # if true: compute ang vel command from heading error
@@ -95,11 +96,11 @@ class AlienGoStairsCfg( AlienGoRoughCfg ):
             lin_vel_x = [-1.0, 1.0]  # min max [m/s]
             lin_vel_y = [-0.5, 0.5]  # min max [m/s]
             ang_vel_yaw = [-1.0, 1.0]  # min max [rad/s]
-            heading = [-1.0, 1.0]
+            heading = [-math.pi, math.pi]
 
     class domain_rand:
         randomize_payload_mass = True
-        payload_mass_range = [-1, 2]
+        payload_mass_range = [0, 2]
 
         randomize_com_displacement = True
         com_displacement_range = [-0.05, 0.05]
@@ -175,7 +176,7 @@ class AlienGoStairsCfg( AlienGoRoughCfg ):
         soft_dof_vel_limit = 0.95
         soft_torque_limit = 0.95
         base_height_target = 0.43
-        foot_height_target_base = -0.25  # 足部距base的 相对距离目标（抬脚高度为0.18 以适应台阶地形）
+        foot_height_target_base = -0.25
         foot_height_target_terrain = 0.15
         max_contact_force = 100.  # forces above this value are penalized
 
@@ -195,5 +196,5 @@ class AlienGoStairsCfgPPO( AlienGoRoughCfgPPO ):
         run_name = ''
         # load and resume
         resume = True
-        load_run = osp.join(logs_root, 'rough_aliengo', 'Jul11_10-53-00_')
+        load_run = osp.join(logs_root, 'flat_aliengo', 'Jul23_11-53-29_init0.1')
         checkpoint = -1  # -1 = last saved model

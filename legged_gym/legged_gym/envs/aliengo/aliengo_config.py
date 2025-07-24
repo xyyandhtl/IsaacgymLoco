@@ -27,7 +27,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
 # Copyright (c) 2021 ETH Zurich, Nikita Rudin
-
+import math
 from legged_gym.envs.base.legged_robot_config import LeggedRobotCfg, LeggedRobotCfgPPO, MOTION_FILES
 
 class AlienGoRoughCfg( LeggedRobotCfg ):
@@ -35,7 +35,7 @@ class AlienGoRoughCfg( LeggedRobotCfg ):
         num_envs = 4096  # 并行仿真的环境数量（需根据GPU显存调整）
         num_one_step_observations = 45  # 单步 观测向量 维度（原始传感器数据）
         num_observations = num_one_step_observations * 6    # 总 观测向量 维度（含6步历史）
-        num_one_step_privileged_obs = 45 + 3 + 3 + 187  # 单步 特权观测向量 维度，包含外部力（3维力+3维力矩）和地形扫描（187个点）
+        num_one_step_privileged_obs = 45 + 3 + 3 + 187  # 单步 特权观测向量 维度，（+3维线速度 + 3维随机扰动力 + 地形扫描(187))
         num_privileged_obs = num_one_step_privileged_obs * 1    # 总 特权观测向量 维度，if not None a priviledge_obs_buf will be returned by step() (critic obs for assymetric training). None is returned otherwise
         num_actions = 12  # 动作空间维度（12个关节）
         env_spacing = 3.  # 环境之间的间距（单位：米），not used with heightfields/trimeshes
@@ -101,9 +101,9 @@ class AlienGoRoughCfg( LeggedRobotCfg ):
 
     class commands( LeggedRobotCfg.commands ):
         curriculum = True
-        max_forward_curriculum = 1.5
+        max_forward_curriculum = 1.5  # x_vel 限制 [-1.0, 1.5]
         max_backward_curriculum = 1.0
-        max_lat_curriculum = 1.0
+        max_lat_curriculum = 1.0  # y_vel 限制 [-1.0, 1.0]
         num_commands = 4 # default: lin_vel_x, lin_vel_y, ang_vel_yaw, heading (in heading mode ang_vel_yaw is recomputed from heading error)
         resampling_time = 10. # time before command are changed[s]
         heading_command = True # if true: compute ang vel command from heading error
@@ -112,7 +112,7 @@ class AlienGoRoughCfg( LeggedRobotCfg ):
             lin_vel_x = [-1.0, 1.0]  # min max [m/s]
             lin_vel_y = [-0.5, 0.5]  # min max [m/s]
             ang_vel_yaw = [-1.0, 1.0]  # min max [rad/s]
-            heading = [-1.0, 1.0]
+            heading = [-math.pi, math.pi]
 
     class asset( LeggedRobotCfg.asset ):
         file = '{LEGGED_GYM_ROOT_DIR}/resources/robots/aliengo/urdf/aliengo.urdf'
@@ -141,7 +141,7 @@ class AlienGoRoughCfg( LeggedRobotCfg ):
     class domain_rand:
         # startup
         randomize_payload_mass = True  # 是否随机改变 base的质量（默认质量 ±）
-        payload_mass_range = [-1, 2]
+        payload_mass_range = [0, 2]
 
         randomize_com_displacement = True  # 是否随机改变 base的质心偏移（xyz）
         com_displacement_range = [-0.05, 0.05]
@@ -226,7 +226,7 @@ class AlienGoRoughCfg( LeggedRobotCfg ):
         soft_dof_pos_limit = 0.95   # 关节位置软限位：关节角度超过URDF限位95%时触发惩罚。调低（如0.9）可提前约束
         soft_dof_vel_limit = 0.95   # 关节速度软限位：超过最大速度95%时惩罚。保护电机模型不过载
         soft_torque_limit = 0.95    # 关节力矩软限位：超过额定扭矩95%时惩罚。防止仿真数值发散
-        base_height_target = 0.43   # 机身目标高度（低于初始高度0.55m）
+        base_height_target = 0.43   # 机身目标高度
         foot_height_target_base = -0.27  # 足部距base的 相对距离目标（抬脚高度为0.15 以适应台阶地形）
         foot_height_target_terrain = 0.15  # 足部离地高度目标
         max_contact_force = 100.    # 四足接触力 > 100N 时触发惩罚的阈值
@@ -293,7 +293,7 @@ class AlienGoRoughCfgPPO( LeggedRobotCfgPPO ):
 
         # logging
         save_interval = 100  # check for potential saves every this many iterations
-        experiment_name = 'rough_aliengo'
+        experiment_name = 'flat_aliengo'
         run_name = ''
         # load and resume
         resume = False

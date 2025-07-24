@@ -39,6 +39,7 @@ from legged_gym import LEGGED_GYM_ROOT_DIR
 import os
 
 import isaacgym
+from isaacgym import gymapi
 from legged_gym.envs import *
 from legged_gym.utils import  get_args, export_policy_as_jit, task_registry, Logger
 
@@ -61,7 +62,7 @@ def play(args, x_vel=1.0, y_vel=0.0, yaw_vel=0.0):
     env_cfg.domain_rand.push_robots = False
     env_cfg.domain_rand.disturbance = False
     env_cfg.domain_rand.randomize_payload_mass = False
-    env_cfg.commands.heading_command = False
+    # env_cfg.commands.heading_command = False
     # env_cfg.terrain.mesh_type = 'plane'
     env_cfg.asset.terminate_after_contacts_on = []
 
