@@ -39,5 +39,5 @@ USING_HYBRID = True
 ```
 
 2. Play and export the latest policy:
-   - `python legged_gym/legged_gym/scripts/play.py --task aliengo --load_run <run_name>`
-   - `python legged_gym/legged_gym/scripts/play.py --task aliengo_stairs --load_run <run_name>`
+   - `python legged_gym/legged_gym/scripts/play.py --task aliengo --load_run <run_name> --load_cfg`
+   - `python legged_gym/legged_gym/scripts/play.py --task aliengo_stairs --load_run <run_name> --load_cfg`

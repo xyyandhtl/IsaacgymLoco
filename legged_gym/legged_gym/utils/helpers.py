@@ -39,6 +39,9 @@ import torch.nn.functional as F
 
 from legged_gym import LEGGED_GYM_ROOT_DIR, LEGGED_GYM_ENVS_DIR
 
+def is_primitive_type(obj):
+    return not hasattr(obj, '__dict__')
+
 def class_to_dict(obj) -> dict:
     if not  hasattr(obj,"__dict__"):
         return obj
@@ -56,13 +59,22 @@ def class_to_dict(obj) -> dict:
         result[key] = element
     return result
 
-def update_class_from_dict(obj, dict):
-    for key, val in dict.items():
+def update_class_from_dict(obj, dict_, strict= False):
+    """ If strict, attributes that are not in dict_ will be removed from obj """
+    attr_names = [n for n in obj.__dict__.keys() if not (n.startswith("__") and n.endswith("__"))]
+    for attr_name in attr_names:
+        if not attr_name in dict_:
+            delattr(obj, attr_name)
+    for key, val in dict_.items():
         attr = getattr(obj, key, None)
-        if isinstance(attr, type):
-            update_class_from_dict(attr, val)
+        if attr is None or is_primitive_type(attr):
+            if isinstance(val, dict):
+                setattr(obj, key, copy.deepcopy(val))
+                update_class_from_dict(getattr(obj, key), val)
+            else:
+                setattr(obj, key, val)
         else:
-            setattr(obj, key, val)
+            update_class_from_dict(attr, val)
     return
 
 def set_seed(seed):
@@ -157,7 +169,7 @@ def update_cfg_from_args(env_cfg, cfg_train, args):
 
     return env_cfg, cfg_train
 
-def get_args():
+def get_args(custom_args=[]):
     custom_parameters = [
         {"name": "--task", "type": str, "default": "aliengo", "help": "Resume training or start testing from a checkpoint. Overrides config file if provided."},
         {"name": "--resume", "action": "store_true", "default": False,  "help": "Resume training from a checkpoint"},
@@ -173,7 +185,7 @@ def get_args():
         {"name": "--seed", "type": int, "help": "Random seed. Overrides config file if provided."},
         {"name": "--max_iterations", "type": int, "help": "Maximum number of training iterations. Overrides config file if provided."},
         {"name": "--recover_mode", "action": "store_true", "default": False, "help": "Train for recovering when fall"},
-    ]
+    ] + custom_args
     # parse arguments
     args = gymutil.parse_arguments(
         description="RL Policy",

@@ -45,11 +45,23 @@ from legged_gym.utils import  get_args, export_policy_as_jit, task_registry, Log
 
 import numpy as np
 import torch
+import json
+from collections import OrderedDict
+
+from legged_gym.utils.helpers import update_class_from_dict
 from legged_gym.envs.base.legged_robot_config import USING_HYBRID
 
 
 def play(args, x_vel=1.0, y_vel=0.0, yaw_vel=0.0):
     env_cfg, train_cfg = task_registry.get_cfgs(name=args.task)
+    if args.load_cfg:
+        json_path = os.path.join("legged_gym/logs", train_cfg.runner.experiment_name, args.load_run, "config.json")
+        print(f"[INFO] loading config from {json_path}")
+        with open(json_path, "r") as f:
+            d = json.load(f, object_pairs_hook=OrderedDict)
+            update_class_from_dict(env_cfg, d, strict=True)
+            update_class_from_dict(train_cfg, d, strict=True)
+
     # override some parameters for testing
     env_cfg.env.num_envs = min(env_cfg.env.num_envs, 100)
     env_cfg.terrain.num_rows = 5
@@ -76,9 +88,9 @@ def play(args, x_vel=1.0, y_vel=0.0, yaw_vel=0.0):
     obs = env.get_observations()
     # load policy
     train_cfg.runner.resume = True
-    ppo_runner, train_cfg = task_registry.make_alg_runner(env=env, name=args.task, args=args, train_cfg=train_cfg)
+    ppo_runner, train_cfg = task_registry.make_alg_runner(env=env, name=args.task, args=args, train_cfg=train_cfg, save_cfg= False)
     policy = ppo_runner.get_inference_policy(device=env.device)
-    print("policy:", policy)
+    print("[INFO] policy:", policy)
 
     # export policy as a jit module (used to run it from C++)
     if EXPORT_POLICY:
@@ -149,5 +161,7 @@ if __name__ == '__main__':
     EXPORT_POLICY = True
     RECORD_FRAMES = False
     MOVE_CAMERA = False
-    args = get_args()
+    args = get_args([
+        dict(name="--load_cfg", action="store_true", default=False, help="use the config from the logdir"),
+    ])
     play(args, x_vel=2.0, y_vel=0.0, yaw_vel=0.0)
