@@ -293,7 +293,7 @@ class AlienGoRoughCfgPPO( LeggedRobotCfgPPO ):
 
         # logging
         save_interval = 100  # check for potential saves every this many iterations
-        experiment_name = 'rough_aliengo'
+        experiment_name = 'flat_aliengo'
         run_name = ''
         # load and resume
         resume = False
