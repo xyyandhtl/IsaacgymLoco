@@ -72,19 +72,19 @@ class HIMRolloutStorage:
         else:
             self.privileged_observations = None
             self.next_privileged_observations = None
-        self.rewards = torch.zeros(num_transitions_per_env, num_envs, 1, device=self.device)  # (100, num_envs, 1)
-        self.actions = torch.zeros(num_transitions_per_env, num_envs, *actions_shape, device=self.device)  # (100, num_envs, 12)
-        self.dones = torch.zeros(num_transitions_per_env, num_envs, 1, device=self.device).byte()  # (100, num_envs, 1)
+        self.rewards = torch.zeros(num_transitions_per_env, num_envs, 1, device=self.device)
+        self.actions = torch.zeros(num_transitions_per_env, num_envs, *actions_shape, device=self.device)
+        self.dones = torch.zeros(num_transitions_per_env, num_envs, 1, device=self.device).byte()
 
         # For PPO
-        self.actions_log_prob = torch.zeros(num_transitions_per_env, num_envs, 1, device=self.device)  # (100, num_envs, 1)
-        self.values = torch.zeros(num_transitions_per_env, num_envs, 1, device=self.device)  # (100, num_envs, 1)
-        self.returns = torch.zeros(num_transitions_per_env, num_envs, 1, device=self.device)  # (100, num_envs, 1)
-        self.advantages = torch.zeros(num_transitions_per_env, num_envs, 1, device=self.device)  # (100, num_envs, 1)
-        self.mu = torch.zeros(num_transitions_per_env, num_envs, *actions_shape, device=self.device)  # (100, num_envs, 12)
-        self.sigma = torch.zeros(num_transitions_per_env, num_envs, *actions_shape, device=self.device)  # (100, num_envs, 12)
+        self.actions_log_prob = torch.zeros(num_transitions_per_env, num_envs, 1, device=self.device)
+        self.values = torch.zeros(num_transitions_per_env, num_envs, 1, device=self.device)
+        self.returns = torch.zeros(num_transitions_per_env, num_envs, 1, device=self.device)
+        self.advantages = torch.zeros(num_transitions_per_env, num_envs, 1, device=self.device)
+        self.mu = torch.zeros(num_transitions_per_env, num_envs, *actions_shape, device=self.device)
+        self.sigma = torch.zeros(num_transitions_per_env, num_envs, *actions_shape, device=self.device)
 
-        self.num_transitions_per_env = num_transitions_per_env  # 100
+        self.num_transitions_per_env = num_transitions_per_env
         self.num_envs = num_envs
 
         self.step = 0
@@ -159,9 +159,8 @@ class HIMRolloutStorage:
         for epoch in range(num_epochs):
             # 遍历 4 个 batch（batch_size = (num_envs * 100) // 4）
             for i in range(num_mini_batches):
-
-                start = i*mini_batch_size
-                end = (i+1)*mini_batch_size
+                start = i * mini_batch_size
+                end = (i + 1) * mini_batch_size
                 batch_idx = indices[start:end]
 
                 obs_batch = observations[batch_idx]

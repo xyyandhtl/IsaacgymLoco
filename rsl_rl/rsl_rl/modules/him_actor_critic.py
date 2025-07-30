@@ -36,40 +36,6 @@ from torch.distributions import Normal
 from .actor_critic import ActorCritic, get_activation
 from rsl_rl.modules.him_estimator import HIMEstimator
 
-class RunningMeanStd:
-    # Dynamically calculate mean and std
-    def __init__(self, shape, device):  # shape:the dimension of input data
-        self.n = 1e-4
-        self.uninitialized = True
-        self.mean = torch.zeros(shape, device=device)
-        self.var = torch.ones(shape, device=device)
-
-    def update(self, x):
-        count = self.n
-        batch_count = x.size(0)
-        tot_count = count + batch_count
-
-        old_mean = self.mean.clone()
-        delta = torch.mean(x, dim=0) - old_mean
-
-        self.mean = old_mean + delta * batch_count / tot_count
-        m_a = self.var * count
-        m_b = x.var(dim=0) * batch_count
-        M2 = m_a + m_b + torch.square(delta) * count * batch_count / tot_count
-        self.var = M2 / tot_count
-        self.n = tot_count
-
-class Normalization:
-    def __init__(self, shape, device='cuda:0'):
-        self.running_ms = RunningMeanStd(shape=shape, device=device)
-
-    def __call__(self, x, update=False):
-        # Whether to update the mean and std,during the evaluating,update=Flase
-        if update:  
-            self.running_ms.update(x)
-        x = (x - self.running_ms.mean) / (torch.sqrt(self.running_ms.var) + 1e-4)
-
-        return x
 
 class HIMActorCritic(nn.Module):
     is_recurrent = False

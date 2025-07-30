@@ -28,6 +28,13 @@
 #
 # Copyright (c) 2021 ETH Zurich, Nikita Rudin
 
+import sys
+from pathlib import Path
+LEGGED_GYM_ROOT_DIR = str(Path(__file__).resolve().parent.parent.parent)
+RSL_RL_ROOT_DIR = str(Path(__file__).resolve().parent.parent.parent.parent / 'rsl_rl')
+sys.path.append(LEGGED_GYM_ROOT_DIR)
+sys.path.append(RSL_RL_ROOT_DIR)
+
 from legged_gym import LEGGED_GYM_ROOT_DIR
 import os
 
@@ -95,7 +102,7 @@ def play(args, x_vel=1.0, y_vel=0.0, yaw_vel=0.0):
         env.commands[:, 0] = x_vel
         env.commands[:, 1] = y_vel
         env.commands[:, 2] = yaw_vel
-        obs, _, rews, dones, infos, _, _ = env.step(actions.detach())
+        obs, _, rews, dones, infos, _, _, _ = env.step(actions.detach())
 
         if RECORD_FRAMES:
             if i % 2:
@@ -138,4 +145,4 @@ if __name__ == '__main__':
     RECORD_FRAMES = False
     MOVE_CAMERA = False
     args = get_args()
-    play(args, x_vel=1.0, y_vel=0.0, yaw_vel=0.0)
+    play(args, x_vel=2.0, y_vel=0.0, yaw_vel=0.0)
