@@ -494,8 +494,11 @@ class LeggedRobot(BaseTask):
             if env_id==0:
                 # prepare friction randomization
                 friction_range = self.cfg.domain_rand.friction_range
+                num_buckets = 64
+                bucket_ids = torch.randint(0, num_buckets, (self.num_envs, 1))
+                friction_buckets = torch_rand_float(friction_range[0], friction_range[1], (num_buckets, 1), device=self.device)
                 # 为每个env生成一个随机摩擦数 (num_env, 1)
-                self.friction_coeffs = torch_rand_float(friction_range[0], friction_range[1], (self.num_envs,1), device=self.device)
+                self.friction_coeffs = friction_buckets[bucket_ids]
 
             for s in range(len(props)):
                 props[s].friction = self.friction_coeffs[env_id]
@@ -505,7 +508,10 @@ class LeggedRobot(BaseTask):
             if env_id==0:
                 # prepare restitution randomization
                 restitution_range = self.cfg.domain_rand.restitution_range
-                self.restitution_coeffs = torch_rand_float(restitution_range[0], restitution_range[1], (self.num_envs,1), device=self.device)
+                num_buckets = 64
+                bucket_ids = torch.randint(0, num_buckets, (self.num_envs, 1))
+                restitution_buckets = torch_rand_float(restitution_range[0], restitution_range[1], (num_buckets, 1), device=self.device)
+                self.restitution_coeffs = restitution_buckets[bucket_ids]
 
             for s in range(len(props)):
                 props[s].restitution = self.restitution_coeffs[env_id]
