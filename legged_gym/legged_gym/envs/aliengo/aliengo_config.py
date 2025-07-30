@@ -157,7 +157,7 @@ class AlienGoRoughCfg( LeggedRobotCfg ):
         restitution_range = [0., 1.0]
 
         # reset
-        randomize_motor_strength = True  # 是否随机化env的电机强度（好像也暂时未启作用）
+        randomize_motor_strength = True  # 是否随机化env的电机强度（输出的actions *）
         motor_strength_range = [0.9, 1.1]
 
         randomize_kp = True  # 是否 随机改变PD控制器的p增益（stiffness）

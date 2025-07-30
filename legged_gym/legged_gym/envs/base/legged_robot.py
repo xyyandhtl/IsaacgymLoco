@@ -648,9 +648,10 @@ class LeggedRobot(BaseTask):
         Returns:
             [torch.Tensor]: Torques sent to the simulation
         """
+        actions = self.motor_strength * actions
         # 1. 根据输入的 actions，计算关节目标位置 = default_dof_pos + actions * 0.5
         actions_scaled = actions * self.cfg.control.action_scale  # actions * 0.5
-        actions_scaled[:, [0, 3, 6, 9]] *=self.cfg.control.hip_reduction  # hip关节的再 * 1.0
+        actions_scaled[:, [0, 3, 6, 9]] *= self.cfg.control.hip_reduction  # hip关节的再 * 1.0
         self.joint_pos_target = self.default_dof_pos + actions_scaled
 
         # 2. 根据控制类型计算扭矩
@@ -924,6 +925,17 @@ class LeggedRobot(BaseTask):
                 if self.cfg.control.control_type in ["P", "V"]:
                     print(f"PD gain of joint {name} were not defined, setting them to zero")
         self.default_dof_pos = self.default_dof_pos.unsqueeze(0)
+
+        # motor_strength
+        self.motor_strength = torch.ones(self.num_envs, self.num_actions, dtype=torch.float, device=self.device, requires_grad=False)
+        if getattr(self.cfg.domain_rand, "randomize_motor_strength", False):
+            mtr_rng = self.cfg.domain_rand.motor_strength_range
+            self.motor_strength = torch_rand_float(
+                mtr_rng[0],
+                mtr_rng[1],
+                (self.num_envs, self.num_actions),
+                device=self.device,
+            )
         
         
         #randomize kp, kd, motor strength
