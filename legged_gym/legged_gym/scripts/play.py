@@ -102,7 +102,7 @@ def play(args, x_vel=1.0, y_vel=0.0, yaw_vel=0.0):
         env.commands[:, 0] = x_vel
         env.commands[:, 1] = y_vel
         env.commands[:, 2] = yaw_vel
-        obs, _, rews, dones, infos, _, _ = env.step(actions.detach())
+        obs, _, rews, dones, infos, _, _, _ = env.step(actions.detach())
 
         if RECORD_FRAMES:
             if i % 2:

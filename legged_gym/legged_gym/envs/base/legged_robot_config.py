@@ -28,6 +28,11 @@
 #
 # Copyright (c) 2021 ETH Zurich, Nikita Rudin
 
+import glob
+from pathlib import Path
+
+MOTION_FILES = glob.glob(str(Path(__file__).parent.parent.parent.parent.parent / 'amp_motions/*'))
+
 from .base_config import BaseConfig
 
 class LeggedRobotCfg(BaseConfig):
@@ -41,6 +46,7 @@ class LeggedRobotCfg(BaseConfig):
         env_spacing = 3.  # not used with heightfields/trimeshes 
         send_timeouts = True # send time out information to the algorithm
         episode_length_s = 20 # episode length in seconds
+        reference_state_initialization = False  # initialize state from reference data
 
     class terrain:
         mesh_type = 'trimesh' # "heightfield" # none, plane, heightfield or trimesh
@@ -160,6 +166,9 @@ class LeggedRobotCfg(BaseConfig):
         delay = True
 
     class rewards:
+        reward_curriculum = False
+        reward_curriculum_term = ["lin_vel_z"]
+        reward_curriculum_schedule = [0, 1000, 1, 0]  # from iter 0 to iter 1000, decrease from 1 to 0
         class scales:
             termination = -0.0
             tracking_lin_vel = 1.0

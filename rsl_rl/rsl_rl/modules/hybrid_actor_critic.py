@@ -33,25 +33,35 @@ import numpy as np
 import torch
 import torch.nn as nn
 from torch.distributions import Normal
+# from torch.nn.modules import rnn
 from .actor_critic import ActorCritic, get_activation
 from rsl_rl.modules.him_estimator import HIMEstimator
 
 
-class HIMActorCritic(nn.Module):
+class HybridActorCritic(nn.Module):
     is_recurrent = False
     def __init__(self, num_actor_obs,  # 45 * 6
                  num_critic_obs,  # 45 + 3 + 3 + 187
                  num_one_step_obs,  # 45
                  num_actions,  # 12
+                 # encoder_hidden_dims=[256, 128],
+                 # wm_encoder_hidden_dims = [64, 32],
                  actor_hidden_dims=[512, 256, 128],
                  critic_hidden_dims=[512, 256, 128],
                  activation='elu',
                  init_noise_std=1.0,
+                 fixed_std=False,
+                 # latent_dim = 32,
+                 # height_dim=187,
+                 # privileged_dim=3 + 24,
+                 # history_dim = 42*5,
+                 # wm_feature_dim = 1536,
+                 # wm_latent_dim=16,
                  **kwargs):
         if kwargs:
             print("ActorCritic.__init__ got unexpected arguments, which will be ignored: " + str(
                 [key for key in kwargs.keys()]))
-        super(HIMActorCritic, self).__init__()
+        super(HybridActorCritic, self).__init__()
 
         activation = get_activation(activation)
 
@@ -65,6 +75,49 @@ class HIMActorCritic(nn.Module):
 
         # Estimator
         self.estimator = HIMEstimator(temporal_steps=self.history_size, num_one_step_obs=num_one_step_obs)
+
+        # self.latent_dim = latent_dim
+        # self.height_dim = height_dim
+        # self.privileged_dim = privileged_dim
+        #
+        # mlp_input_dim_a = latent_dim + 3 + wm_latent_dim #latent vector + command + wm_latent
+        # mlp_input_dim_c = num_critic_obs + wm_latent_dim
+
+        # History Encoder
+        # encoder_layers = []
+        # encoder_layers.append(nn.Linear(history_dim, encoder_hidden_dims[0]))
+        # encoder_layers.append(activation)
+        # for l in range(len(encoder_hidden_dims)):
+        #     if l == len(encoder_hidden_dims) - 1:
+        #         encoder_layers.append(nn.Linear(encoder_hidden_dims[l], latent_dim))
+        #     else:
+        #         encoder_layers.append(nn.Linear(encoder_hidden_dims[l], encoder_hidden_dims[l + 1]))
+        #         encoder_layers.append(activation)
+        # self.history_encoder = nn.Sequential(*encoder_layers)
+
+        # World Model Feature Encoder
+        # wm_encoder_layers = []
+        # wm_encoder_layers.append(nn.Linear(wm_feature_dim, wm_encoder_hidden_dims[0]))
+        # wm_encoder_layers.append(activation)
+        # for l in range(len(wm_encoder_hidden_dims)):
+        #     if l == len(wm_encoder_hidden_dims) - 1:
+        #         wm_encoder_layers.append(nn.Linear(wm_encoder_hidden_dims[l], wm_latent_dim))
+        #     else:
+        #         wm_encoder_layers.append(nn.Linear(wm_encoder_hidden_dims[l], wm_encoder_hidden_dims[l + 1]))
+        #         wm_encoder_layers.append(activation)
+        # self.wm_feature_encoder = nn.Sequential(*wm_encoder_layers)
+
+        # Critic World Model Feature Encoder
+        # critic_wm_encoder_layers = []
+        # critic_wm_encoder_layers.append(nn.Linear(wm_feature_dim, wm_encoder_hidden_dims[0]))
+        # critic_wm_encoder_layers.append(activation)
+        # for l in range(len(wm_encoder_hidden_dims)):
+        #     if l == len(wm_encoder_hidden_dims) - 1:
+        #         critic_wm_encoder_layers.append(nn.Linear(wm_encoder_hidden_dims[l], wm_latent_dim))
+        #     else:
+        #         critic_wm_encoder_layers.append(nn.Linear(wm_encoder_hidden_dims[l], wm_encoder_hidden_dims[l + 1]))
+        #         critic_wm_encoder_layers.append(activation)
+        # self.critic_wm_feature_encoder = nn.Sequential(*critic_wm_encoder_layers)
 
         # Policy
         actor_layers = []
@@ -97,10 +150,13 @@ class HIMActorCritic(nn.Module):
 
         # Action noise
         self.std = nn.Parameter(init_noise_std * torch.ones(num_actions))
+        # self.fixed_std = fixed_std
+        # std = init_noise_std * torch.ones(num_actions)
+        # self.std = torch.tensor(std) if fixed_std else nn.Parameter(std)
         self.distribution = None
         # disable args validation for speedup
         Normal.set_default_validate_args = False
-        
+
         # seems that we get better performance without init
         # self.init_memory_weights(self.memory_a, 0.001, 0.)
         # self.init_memory_weights(self.memory_c, 0.001, 0.)
@@ -117,7 +173,7 @@ class HIMActorCritic(nn.Module):
 
     def forward(self):
         raise NotImplementedError
-    
+
     @property
     def action_mean(self):
         return self.distribution.mean
@@ -125,7 +181,7 @@ class HIMActorCritic(nn.Module):
     @property
     def action_std(self):
         return self.distribution.stddev
-    
+
     @property
     def entropy(self):
         return self.distribution.entropy().sum(dim=-1)
@@ -138,15 +194,31 @@ class HIMActorCritic(nn.Module):
         mean = self.actor(actor_input)
         self.distribution = Normal(mean, mean * 0. + self.std)
 
+    # def act(self, observations, history, wm_feature, **kwargs):
+    #     latent_vector = self.history_encoder(history)
+    #     command = observations[:, self.privileged_dim + 6:self.privileged_dim + 9]
+    #     wm_latent_vector = self.wm_feature_encoder(wm_feature)
+    #     concat_observations = torch.concat((latent_vector, command, wm_latent_vector),
+    #                                        dim=-1)
+    #     self.update_distribution(concat_observations)
+    #     return self.distribution.sample()
     def act(self, obs_history=None, **kwargs):
         # 根据历史观测，更新actions的正态分布，并采样得到一个 actions
         self.update_distribution(obs_history)
         return self.distribution.sample()
-    
+
     def get_actions_log_prob(self, actions):
         # 计算 给定actions 在当前policy输出的actions正态分布下的 对数概率
         return self.distribution.log_prob(actions).sum(dim=-1)  # (num_envs, 12) ==> (num_envs, 1)
 
+    # def act_inference(self, observations, history, wm_feature):
+    #     latent_vector = self.history_encoder(history)
+    #     command = observations[:, self.privileged_dim + 6:self.privileged_dim + 9]
+    #     wm_latent_vector = self.wm_feature_encoder(wm_feature)
+    #     concat_observations = torch.concat((latent_vector, command, wm_latent_vector),
+    #                                        dim=-1)
+    #     actions_mean = self.actor(concat_observations)
+    #     return actions_mean
     def act_inference(self, obs_history, observations=None):
         # 根据历史观测，计算policy输出的 actions正态分布的 均值，直接作为输出
         vel, latent = self.estimator(obs_history)
@@ -154,6 +226,12 @@ class HIMActorCritic(nn.Module):
         mean = self.actor(actor_input)
         return mean
 
+    # def evaluate(self, critic_observations, wm_feature,  **kwargs):
+    #     wm_latent_vector = self.critic_wm_feature_encoder(wm_feature)
+    #     concat_observations = torch.concat((critic_observations, wm_latent_vector),
+    #                                        dim=-1)
+    #     value = self.critic(concat_observations)
+    #     return value
     def evaluate(self, critic_observations, **kwargs):
         value = self.critic(critic_observations)
         return value

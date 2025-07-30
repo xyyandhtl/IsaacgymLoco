@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: Copyright (c) 2021 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: BSD-3-Clause
-# 
+#
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
 #
@@ -33,45 +33,106 @@ import os
 from collections import deque
 import statistics
 
+import numpy as np
 from torch.utils.tensorboard import SummaryWriter
 import torch
 
-from rsl_rl.algorithms import PPO, HIMPPO
+from rsl_rl.algorithms import PPO, HybridPPO
 from rsl_rl.modules import HIMActorCritic
 from rsl_rl.env import VecEnv
+from rsl_rl.algorithms.amp_discriminator import AMPDiscriminator
+from rsl_rl.datasets.motion_loader import AMPLoader
+from rsl_rl.utils.utils import Normalizer
+# from rsl_rl.modules import DepthPredictor
+import torch.optim as optim
 
+# from dreamer.models import *
+import ruamel.yaml as yaml
+import argparse
+import pathlib
+import sys
+# import collections
+# from dreamer import tools
+# import datetime
+# import uuid
 
-class HIMOnPolicyRunner:
+class HybridPolicyRunner:
 
     def __init__(self,
                  env: VecEnv,
                  train_cfg,
                  log_dir=None,
-                 device='cpu'):
+                 device='cpu',
+                 # history_length=5,
+                 ):
 
         self.cfg = train_cfg["runner"]
         self.alg_cfg = train_cfg["algorithm"]
         self.policy_cfg = train_cfg["policy"]
+        # self.depth_predictor_cfg = train_cfg["depth_predictor"]
         self.device = device
         self.env = env
+        # self.history_length = history_length
         if self.env.num_privileged_obs is not None:
             num_critic_obs = self.env.num_privileged_obs  # 45 + 3 + 3 + 187
         else:
             num_critic_obs = self.env.num_obs
+        # if self.env.include_history_steps is not None:
+        #     num_actor_obs = self.env.num_obs * self.env.include_history_steps
+        # else:
+        #     num_actor_obs = self.env.num_obs
         self.num_actor_obs = self.env.num_obs  # 45 * 6
         self.num_critic_obs = num_critic_obs
+
         actor_critic_class = eval(self.cfg["policy_class_name"])  # HIMActorCritic
         actor_critic: HIMActorCritic = actor_critic_class(self.env.num_obs,  # 45 * 6
                                                           num_critic_obs,  # 45 + 3 + 3 + 187
                                                           self.env.num_one_step_obs,  # 45
                                                           self.env.num_actions,  # 12
                                                           **self.policy_cfg).to(self.device)
+
+        # build world model
+        # self._build_world_model()
+
+        # build depth predictor
+        # self.depth_predictor = DepthPredictor().to(self._world_model.device)
+        # self.depth_predictor_opt = optim.Adam(self.depth_predictor.parameters(), lr=self.depth_predictor_cfg["lr"],
+        #                                       weight_decay=self.depth_predictor_cfg["weight_decay"])
+
+        # self.history_dim = history_length * (self.env.num_obs - self.env.privileged_dim - self.env.height_dim-3) #exclude command
+        # actor_critic = ActorCriticWMP(num_actor_obs=num_actor_obs,
+        #                                   num_critic_obs=num_critic_obs,
+        #                                   num_actions=self.env.num_actions,
+        #                                   height_dim=self.env.height_dim,
+        #                                   privileged_dim=self.env.privileged_dim,
+        #                                   history_dim=self.history_dim,
+        #                                   wm_feature_dim=self.wm_feature_dim,
+        #                                   **self.policy_cfg).to(self.device)
+
+        amp_data = AMPLoader(
+            device, time_between_frames=self.env.dt, preload_transitions=True,
+            num_preload_transitions=train_cfg['runner']['amp_num_preload_transitions'],
+            motion_files=self.cfg["amp_motion_files"])
+        amp_normalizer = Normalizer(amp_data.observation_dim)
+        discriminator = AMPDiscriminator(
+            amp_data.observation_dim * 2,
+            train_cfg['runner']['amp_reward_coef'],
+            train_cfg['runner']['amp_discr_hidden_dims'], device,
+            train_cfg['runner']['amp_task_reward_lerp']).to(self.device)
+
+        # self.discr: AMPDiscriminator = AMPDiscriminator()
         alg_class = eval(self.cfg["algorithm_class_name"])  # HIMPPO
-        self.alg: HIMPPO = alg_class(actor_critic, device=self.device, **self.alg_cfg)
+        min_std = (
+                torch.tensor(self.cfg["min_normalized_std"], device=self.device) *
+                (torch.abs(self.env.dof_pos_limits[:, 1] - self.env.dof_pos_limits[:, 0])))
+        self.alg: HybridPPO = alg_class(actor_critic, discriminator, amp_data, amp_normalizer, device=self.device,
+                                        min_std=min_std, **self.alg_cfg)
         self.num_steps_per_env = self.cfg["num_steps_per_env"]
         self.save_interval = self.cfg["save_interval"]
 
         # init storage and model
+        # self.alg.init_storage(self.env.num_envs, self.num_steps_per_env, [num_actor_obs],
+        #                       [self.env.num_privileged_obs], [self.env.num_actions], self.history_dim, self.wm_feature_dim)
         self.alg.init_storage(self.env.num_envs, self.num_steps_per_env, [self.env.num_obs], [self.env.num_privileged_obs], [self.env.num_actions])
 
         # Log
@@ -82,7 +143,7 @@ class HIMOnPolicyRunner:
         self.current_learning_iteration = 0
 
         _, _ = self.env.reset()
-    
+
     def learn(self, num_learning_iterations, init_at_random_ep_len=False):
         # initialize writer
         if self.log_dir is not None and self.writer is None:
@@ -91,9 +152,11 @@ class HIMOnPolicyRunner:
             self.env.episode_length_buf = torch.randint_like(self.env.episode_length_buf, high=int(self.env.max_episode_length))
         obs = self.env.get_observations()
         privileged_obs = self.env.get_privileged_observations()
+        amp_obs = self.env.get_amp_observations()
         critic_obs = privileged_obs if privileged_obs is not None else obs
-        obs, critic_obs = obs.to(self.device), critic_obs.to(self.device)
-        self.alg.actor_critic.train() # switch to train mode (for dropout for example)
+        obs, critic_obs, amp_obs = obs.to(self.device), critic_obs.to(self.device), amp_obs.to(self.device)
+        self.alg.actor_critic.train()  # switch to train mode (for dropout for example)
+        self.alg.discriminator.train()
 
         ep_infos = []
         rewbuffer = deque(maxlen=100)
@@ -102,27 +165,90 @@ class HIMOnPolicyRunner:
         cur_episode_length = torch.zeros(self.env.num_envs, dtype=torch.float, device=self.device)
 
         tot_iter = self.current_learning_iteration + num_learning_iterations
+
+        # process trajectory history
+        # self.trajectory_history = torch.zeros(size=(self.env.num_envs, self.history_length, self.env.num_obs -
+        #                                             self.env.privileged_dim - self.env.height_dim - 3),
+        #                                       device=self.device)
+        # obs_without_command = torch.concat((obs[:, self.env.privileged_dim:self.env.privileged_dim + 6],
+        #                                     obs[:, self.env.privileged_dim + 9:-self.env.height_dim]), dim=1)
+        # self.trajectory_history = torch.concat((self.trajectory_history[:, 1:], obs_without_command.unsqueeze(1)),
+        #                                        dim=1)
+
+        # init world model input
+        # sum_wm_dataset_size = 0
+        # wm_latent = wm_action = None
+        # wm_is_first = torch.ones(self.env.num_envs, device=self._world_model.device)
+        # wm_obs = {
+        #     "prop": obs[:, self.env.privileged_dim: self.env.privileged_dim + self.env.cfg.env.prop_dim].to(self._world_model.device),
+        #     "is_first": wm_is_first,
+        # }
+        #
+        # if(self.env.cfg.depth.use_camera):
+        #     wm_obs["image"] = torch.zeros(((self.env.num_envs,) + self.env.cfg.depth.resized + (1,)), device=self._world_model.device)
+        #
+        # wm_metrics = None
+        # self.wm_update_interval = self.env.cfg.depth.update_interval
+        # wm_action_history = torch.zeros(size=(self.env.num_envs, self.wm_update_interval, self.env.num_actions),
+        #                                 device=self._world_model.device)
+        # wm_reward = torch.zeros(self.env.num_envs, device=self._world_model.device)
+        # wm_feature = torch.zeros((self.env.num_envs, self.wm_feature_dim))
+        #
+        # self.init_wm_dataset()
+
         for it in range(self.current_learning_iteration, tot_iter):
+            if self.env.cfg.rewards.reward_curriculum:
+                self.env.update_reward_curriculum(it)
             start = time.time()
             # Rollout
             with torch.inference_mode():
                 # 进行 num_steps_per_env 次 env_step
                 for i in range(self.num_steps_per_env):
+                    # if (self.env.global_counter % self.wm_update_interval == 0):
+                    #     # world model obs step
+                    #     wm_embed = self._world_model.encoder(wm_obs)
+                    #     wm_latent, _ = self._world_model.dynamics.obs_step(wm_latent, wm_action, wm_embed,
+                    #                                                        wm_obs["is_first"])
+                    #     wm_feature = self._world_model.dynamics.get_deter_feat(wm_latent)
+                    #     wm_is_first[:] = 0
+
                     # 1. 根据当前观测 计算actions正态分布 和 价值
-                    actions = self.alg.act(obs, critic_obs)
+                    # history = self.trajectory_history.flatten(1).to(self.device)
+                    # actions = self.alg.act(obs, critic_obs, amp_obs, history, wm_feature.to(self.env.device))
+                    actions = self.alg.act(obs, critic_obs, amp_obs)
                     # 2. 在仿真环境中应用该actions，执行执行一个 env_step（包含 4 个sim_step）
                     # 获取：新观测、新特权观测、奖励buffer、重置buffer、额外信息、要重置env的ID、要重置env的特权观测
-                    obs, privileged_obs, rewards, dones, infos, termination_ids, termination_privileged_obs = self.env.step(actions)
+                    obs, privileged_obs, rewards, dones, infos, reset_env_ids, termination_privileged_obs, terminal_amp_states = self.env.step(actions)
+                    next_amp_obs = self.env.get_amp_observations()
 
                     critic_obs = privileged_obs if privileged_obs is not None else obs
-                    obs, critic_obs, rewards, dones = obs.to(self.device), critic_obs.to(self.device), rewards.to(self.device), dones.to(self.device)
-                    termination_ids = termination_ids.to(self.device)
+                    obs, critic_obs, next_amp_obs, rewards, dones = obs.to(self.device), critic_obs.to(
+                        self.device), next_amp_obs.to(self.device), rewards.to(self.device), dones.to(self.device)
+
+                    # 2.5. 处理terminal cases, amp和critic
+                    next_amp_obs_with_term = torch.clone(next_amp_obs)
+                    next_amp_obs_with_term[reset_env_ids] = terminal_amp_states
+
+                    rewards = self.alg.discriminator.predict_amp_reward(
+                        amp_obs, next_amp_obs_with_term, rewards, normalizer=self.alg.amp_normalizer)[0]
+                    amp_obs = torch.clone(next_amp_obs)
+
+                    reset_env_ids = reset_env_ids.to(self.device)
                     termination_privileged_obs = termination_privileged_obs.to(self.device)
 
                     next_critic_obs = critic_obs.clone().detach()
-                    next_critic_obs[termination_ids] = termination_privileged_obs.clone().detach()
+                    next_critic_obs[reset_env_ids] = termination_privileged_obs.clone().detach()
                     # 3. 将当前env_step完成后的数据 记录到  rollout 中
-                    self.alg.process_env_step(rewards, dones, infos, next_critic_obs)
+                    self.alg.process_env_step(rewards, dones, infos, next_amp_obs_with_term, next_critic_obs)
+
+                    # process trajectory history
+                    # env_ids = dones.nonzero(as_tuple=False).flatten()
+                    # self.trajectory_history[env_ids] = 0
+                    # obs_without_command = torch.concat((obs[:, self.env.privileged_dim:self.env.privileged_dim + 6],
+                    #                                     obs[:, self.env.privileged_dim + 9:-self.env.height_dim]),
+                    #                                    dim=1)
+                    # self.trajectory_history = torch.concat(
+                    #     (self.trajectory_history[:, 1:], obs_without_command.unsqueeze(1)), dim=1)
 
                     if self.log_dir is not None:
                         # Book keeping
@@ -142,17 +268,20 @@ class HIMOnPolicyRunner:
                 # Learning step
                 start = stop
                 self.alg.compute_returns(critic_obs)
-                
-            mean_value_loss, mean_surrogate_loss, mean_estimation_loss, mean_swap_loss = self.alg.update()
+
+            mean_value_loss, mean_surrogate_loss, mean_estimation_loss, mean_swap_loss, mean_amp_loss, mean_grad_pen_loss, mean_policy_pred, mean_expert_pred = self.alg.update()
             stop = time.time()
             learn_time = stop - start
-
             if self.log_dir is not None:
                 self.log(locals())
             if it % self.save_interval == 0:
                 self.save(os.path.join(self.log_dir, 'model_{}.pt'.format(it)))
             ep_infos.clear()
-        
+
+            # copy the config file
+            # if it == 0:
+            #     os.system("cp ./legged_gym/envs/a1/a1_amp_config.py " + self.log_dir + "/")
+
         self.current_learning_iteration += num_learning_iterations
         self.save(os.path.join(self.log_dir, 'model_{}.pt'.format(self.current_learning_iteration)))
 
@@ -182,7 +311,12 @@ class HIMOnPolicyRunner:
         self.writer.add_scalar('Loss/surrogate', locs['mean_surrogate_loss'], locs['it'])
         self.writer.add_scalar('Loss/Estimation Loss', locs['mean_estimation_loss'], locs['it'])
         self.writer.add_scalar('Loss/Swap Loss', locs['mean_swap_loss'], locs['it'])
+        # self.writer.add_scalar('Loss/vel_predict', locs['mean_vel_predict_loss'], locs['it'])
+        self.writer.add_scalar('Loss/AMP', locs['mean_amp_loss'], locs['it'])
+        self.writer.add_scalar('Loss/AMP_grad', locs['mean_grad_pen_loss'], locs['it'])
         self.writer.add_scalar('Loss/learning_rate', self.alg.learning_rate, locs['it'])
+        self.writer.add_scalar('Loss/AMP_mean_policy_pred', locs['mean_policy_pred'], locs['it'])
+        self.writer.add_scalar('Loss/AMP_mean_expert_pred', locs['mean_expert_pred'], locs['it'])
         self.writer.add_scalar('Policy/mean_noise_std', mean_std.item(), locs['it'])
         self.writer.add_scalar('Perf/total_fps', fps, locs['it'])
         self.writer.add_scalar('Perf/collection time', locs['collection_time'], locs['it'])
@@ -202,8 +336,13 @@ class HIMOnPolicyRunner:
                               'collection_time']:.3f}s, learning {locs['learn_time']:.3f}s)\n"""
                           f"""{'Value function loss:':>{pad}} {locs['mean_value_loss']:.4f}\n"""
                           f"""{'Surrogate loss:':>{pad}} {locs['mean_surrogate_loss']:.4f}\n"""
+                          # f"""{'Vel predict loss:':>{pad}} {locs['mean_vel_predict_loss']:.4f}\n"""
                           f"""{'Estimation loss:':>{pad}} {locs['mean_estimation_loss']:.4f}\n"""
                           f"""{'Swap loss:':>{pad}} {locs['mean_swap_loss']:.4f}\n"""
+                          f"""{'AMP loss:':>{pad}} {locs['mean_amp_loss']:.4f}\n"""
+                          f"""{'AMP grad pen loss:':>{pad}} {locs['mean_grad_pen_loss']:.4f}\n"""
+                          f"""{'AMP mean policy pred:':>{pad}} {locs['mean_policy_pred']:.4f}\n"""
+                          f"""{'AMP mean expert pred:':>{pad}} {locs['mean_expert_pred']:.4f}\n"""
                           f"""{'Mean action noise std:':>{pad}} {mean_std.item():.2f}\n"""
                           f"""{'Mean reward:':>{pad}} {statistics.mean(locs['rewbuffer']):.2f}\n"""
                           f"""{'Mean episode length:':>{pad}} {statistics.mean(locs['lenbuffer']):.2f}\n""")
@@ -234,14 +373,24 @@ class HIMOnPolicyRunner:
         torch.save({
             'model_state_dict': self.alg.actor_critic.state_dict(),
             'optimizer_state_dict': self.alg.optimizer.state_dict(),
+            # 'world_model_dict': self._world_model.state_dict(),
+            # 'wm_optimizer_state_dict': self._world_model._model_opt._opt.state_dict(),
+            # 'depth_predictor': self.depth_predictor.state_dict(),
             'estimator_optimizer_state_dict': self.alg.actor_critic.estimator.optimizer.state_dict(),
+            # 'discriminator_state_dict': self.alg.discriminator.state_dict(),
+            # 'amp_normalizer': self.alg.amp_normalizer,
             'iter': self.current_learning_iteration,
             'infos': infos,
         }, path)
 
     def load(self, path, load_optimizer=True):
         loaded_dict = torch.load(path)
-        self.alg.actor_critic.load_state_dict(loaded_dict['model_state_dict'])
+        self.alg.actor_critic.load_state_dict(loaded_dict['model_state_dict'])  # , strict=False
+        # self._world_model.load_state_dict(loaded_dict['world_model_dict'], strict=False)
+        # if(load_wm_optimizer):
+        #     self._world_model._model_opt._opt.load_state_dict(loaded_dict['wm_optimizer_state_dict'])
+        # self.alg.discriminator.load_state_dict(loaded_dict['discriminator_state_dict'], strict=False)
+        # self.alg.amp_normalizer = loaded_dict['amp_normalizer']
         if load_optimizer:
             self.alg.optimizer.load_state_dict(loaded_dict['optimizer_state_dict'])
             self.alg.actor_critic.estimator.optimizer.load_state_dict(loaded_dict['estimator_optimizer_state_dict'])

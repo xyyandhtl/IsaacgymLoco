@@ -28,7 +28,8 @@
 #
 # Copyright (c) 2021 ETH Zurich, Nikita Rudin
 from os import path as osp
-from legged_gym.envs.aliengo.aliengo_config import AlienGoRoughCfg, AlienGoRoughCfgPPO
+# from legged_gym.envs.aliengo.aliengo_config import AlienGoRoughCfg, AlienGoRoughCfgPPO
+from legged_gym.envs.aliengo.aliengo_hybrid_config import AlienGoRoughCfg, AlienGoRoughCfgPPO
 
 class AlienGoStairsCfg( AlienGoRoughCfg ):
 
@@ -179,7 +180,7 @@ class AlienGoStairsCfgPPO( AlienGoRoughCfgPPO ):
 
     class runner( AlienGoRoughCfgPPO.runner ):
         policy_class_name = 'HIMActorCritic'
-        algorithm_class_name = 'HIMPPO'
+        # algorithm_class_name = 'HybridPPO'
         num_steps_per_env = 100  # per iteration
         max_iterations = 3000  # number of policy updates
 
@@ -189,5 +190,5 @@ class AlienGoStairsCfgPPO( AlienGoRoughCfgPPO ):
         run_name = ''
         # load and resume
         resume = True
-        load_run = osp.join(logs_root, 'stairs_aliengo', 'Jul11_13-47-20_')
+        load_run = osp.join(logs_root, 'rough_aliengo', 'Jul29_14-35-18_')
         checkpoint = -1  # -1 = last saved model

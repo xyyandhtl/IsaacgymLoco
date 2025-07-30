@@ -49,6 +49,7 @@ from legged_gym.utils.math import quat_apply_yaw, wrap_to_pi, torch_rand_sqrt_fl
 from legged_gym.utils.helpers import class_to_dict
 from legged_gym.utils.math import random_quat
 from .legged_robot_config import LeggedRobotCfg
+from rsl_rl.datasets.motion_loader import AMPLoader
 
 class LeggedRobot(BaseTask):
     def __init__(self, cfg: LeggedRobotCfg, sim_params, physics_engine, sim_device, headless):
@@ -115,6 +116,9 @@ class LeggedRobot(BaseTask):
         self.init_done = True
         # ------ 初始化完成 ------
 
+        if self.cfg.env.reference_state_initialization:
+            self.amp_loader = AMPLoader(motion_files=self.cfg.env.amp_motion_files, device=self.device, time_between_frames=self.dt)
+
     def step(self, actions):
         """ Apply actions, simulate, call self.post_physics_step()
 
@@ -156,7 +160,8 @@ class LeggedRobot(BaseTask):
         # (6) 重置某些env
         # (7) 更新上一env_step的数据（action、关节位置、关节速度、扭矩、base的线速度和角速度）
         #   返回： 需要重置的env的 ID (num_envs_,) 以及这些env的特权观测 (num_envs_, 45+3+3+187)
-        termination_ids, termination_priveleged_obs = self.post_physics_step()
+        # termination_ids, termination_priveleged_obs = self.post_physics_step()
+        termination_ids, termination_priveleged_obs, terminal_amp_states = self.post_physics_step()
 
         # 6. 裁剪 观测obs_buf 到 [-100., 100.]
         clip_obs = self.cfg.normalization.clip_observations
@@ -165,7 +170,8 @@ class LeggedRobot(BaseTask):
         if self.privileged_obs_buf is not None:
             self.privileged_obs_buf = torch.clip(self.privileged_obs_buf, -clip_obs, clip_obs)
 
-        return self.obs_buf, self.privileged_obs_buf, self.rew_buf, self.reset_buf, self.extras, termination_ids, termination_priveleged_obs
+        # return self.obs_buf, self.privileged_obs_buf, self.rew_buf, self.reset_buf, self.extras, termination_ids, termination_priveleged_obs
+        return self.obs_buf, self.privileged_obs_buf, self.rew_buf, self.reset_buf, self.extras, termination_ids, termination_priveleged_obs, terminal_amp_states
 
     def post_physics_step(self):
         """
@@ -217,6 +223,7 @@ class LeggedRobot(BaseTask):
         env_ids = self.reset_buf.nonzero(as_tuple=False).flatten()  # 获取需要重置的 env ID
         # 获取需要重置的 env 的特权观测 (num_envs_, 45+3+3+187)
         termination_privileged_obs = self.compute_termination_observations(env_ids)
+        terminal_amp_states = self.get_amp_observations()[env_ids]
         self.reset_idx(env_ids)  # 重置这些 env
 
         # 8. 计算 观测
@@ -234,7 +241,8 @@ class LeggedRobot(BaseTask):
         if self.viewer and self.enable_viewer_sync and self.debug_viz:
             self._draw_debug_vis()
 
-        return env_ids, termination_privileged_obs
+        # return env_ids, termination_privileged_obs
+        return env_ids, termination_privileged_obs, terminal_amp_states
 
     def check_termination(self):
         """ Check if environments need to be reset
@@ -286,8 +294,13 @@ class LeggedRobot(BaseTask):
             self.update_command_curriculum(env_ids)
         
         # 重置关节、base状态
-        self._reset_dofs(env_ids)
-        self._reset_root_states(env_ids)
+        if self.cfg.env.reference_state_initialization:
+            frames = self.amp_loader.get_full_frame_batch(len(env_ids))
+            self._reset_dofs_amp(env_ids, frames)
+            self._reset_root_states_amp(env_ids, frames)
+        else:
+            self._reset_dofs(env_ids)
+            self._reset_root_states(env_ids)
 
         # 4. 为重置的 env 重新采样 commands
         self._resample_commands(env_ids)
@@ -375,6 +388,18 @@ class LeggedRobot(BaseTask):
 
         self.obs_buf = torch.cat((current_obs[:, :self.num_one_step_obs], self.obs_buf[:, :-self.num_one_step_obs]), dim=-1)  # 6 steps
         self.privileged_obs_buf = torch.cat((current_obs[:, :self.num_one_step_privileged_obs], self.privileged_obs_buf[:, :-self.num_one_step_privileged_obs]), dim=-1)
+
+    def get_amp_observations(self):
+        joint_pos = self.dof_pos
+        # foot_pos = self.foot_positions_in_base_frame(self.dof_pos).to(self.device)
+        base_lin_vel = self.base_lin_vel
+        base_ang_vel = self.base_ang_vel
+        joint_vel = self.dof_vel
+        # z_pos = self.root_states[:, 2:3]
+        # if (self.cfg.terrain.measure_heights):
+        #     z_pos = z_pos - torch.mean(self.measured_heights, dim=-1, keepdim=True)
+        # return torch.cat((joint_pos, foot_pos, base_lin_vel, base_ang_vel, joint_vel, z_pos), dim=-1)
+        return torch.cat((joint_pos, base_lin_vel, base_ang_vel, joint_vel), dim=-1)
 
     def get_current_obs(self):
         current_obs = torch.cat((   self.commands[:, :3] * self.commands_scale,
@@ -657,6 +682,23 @@ class LeggedRobot(BaseTask):
         self.gym.set_dof_state_tensor_indexed(self.sim,
                                               gymtorch.unwrap_tensor(self.dof_state),
                                               gymtorch.unwrap_tensor(env_ids_int32), len(env_ids_int32))
+
+    def _reset_dofs_amp(self, env_ids, frames):
+        """ Resets DOF position and velocities of selected environmments
+        Positions are randomly selected within 0.5:1.5 x default positions.
+        Velocities are set to zero.
+
+        Args:
+            env_ids (List[int]): Environemnt ids
+            frames: AMP frames to initialize motion with
+        """
+        self.dof_pos[env_ids] = AMPLoader.get_joint_pose_batch(frames)
+        self.dof_vel[env_ids] = AMPLoader.get_joint_vel_batch(frames)
+        env_ids_int32 = env_ids.to(dtype=torch.int32)
+        self.gym.set_dof_state_tensor_indexed(self.sim,
+                                              gymtorch.unwrap_tensor(self.dof_state),
+                                              gymtorch.unwrap_tensor(env_ids_int32), len(env_ids_int32))
+
     def _reset_root_states(self, env_ids):
         """ Resets ROOT states position and velocities of selected environmments
             Sets base position based on the curriculum
@@ -686,6 +728,27 @@ class LeggedRobot(BaseTask):
                                                      gymtorch.unwrap_tensor(self.root_states),
                                                      gymtorch.unwrap_tensor(env_ids_int32), len(env_ids_int32))
 
+    def _reset_root_states_amp(self, env_ids, frames):
+        """ Resets ROOT states position and velocities of selected environmments
+            Sets base position based on the curriculum
+            Selects randomized base velocities within -0.5:0.5 [m/s, rad/s]
+        Args:
+            env_ids (List[int]): Environemnt ids
+        """
+        # base position
+        root_pos = AMPLoader.get_root_pos_batch(frames)
+        root_pos[:, :2] = root_pos[:, :2] + self.env_origins[env_ids, :2]
+        self.root_states[env_ids, :3] = root_pos
+        root_orn = AMPLoader.get_root_rot_batch(frames)
+        self.root_states[env_ids, 3:7] = root_orn
+        self.root_states[env_ids, 7:10] = quat_rotate(root_orn, AMPLoader.get_linear_vel_batch(frames))
+        self.root_states[env_ids, 10:13] = quat_rotate(root_orn, AMPLoader.get_angular_vel_batch(frames))
+
+        env_ids_int32 = env_ids.to(dtype=torch.int32)
+        self.gym.set_actor_root_state_tensor_indexed(self.sim,
+                                                     gymtorch.unwrap_tensor(self.root_states),
+                                                     gymtorch.unwrap_tensor(env_ids_int32), len(env_ids_int32))
+
     def _push_robots(self):
         """ Random pushes the robots. Emulates an impulse by setting a randomized base velocity. (瞬时的)
         """
@@ -693,6 +756,14 @@ class LeggedRobot(BaseTask):
         # 给 base 的xy方向线速度 上再添加随机 速度
         self.root_states[:, 7:9] = torch_rand_float(-max_vel, max_vel, (self.num_envs, 2), device=self.device) # lin vel x/y
         self.gym.set_actor_root_state_tensor(self.sim, gymtorch.unwrap_tensor(self.root_states))
+
+    def update_reward_curriculum(self, current_iter):
+        for i in range(len(self.cfg.rewards.reward_curriculum_schedule)):
+            percentage = (current_iter - self.cfg.rewards.reward_curriculum_schedule[i][0]) / \
+                         (self.cfg.rewards.reward_curriculum_schedule[i][1] - self.cfg.rewards.reward_curriculum_schedule[i][0])
+            percentage = max(min(percentage, 1), 0)
+            self.reward_curriculum_coef[i] = (1 - percentage) * self.cfg.rewards.reward_curriculum_schedule[i][2] + \
+                                          percentage * self.cfg.rewards.reward_curriculum_schedule[i][3]
 
     def _disturbance_robots(self):
         """ Random add disturbance force to the robots.
