@@ -48,7 +48,7 @@ from legged_gym.utils.terrain import Terrain
 from legged_gym.utils.math import quat_apply_yaw, wrap_to_pi, torch_rand_sqrt_float
 from legged_gym.utils.helpers import class_to_dict
 from legged_gym.utils.math import random_quat
-from .legged_robot_config import LeggedRobotCfg
+from .legged_robot_config import LeggedRobotCfg, USING_HYBRID
 from rsl_rl.datasets.motion_loader import AMPLoader
 
 class LeggedRobot(BaseTask):
@@ -170,8 +170,10 @@ class LeggedRobot(BaseTask):
         if self.privileged_obs_buf is not None:
             self.privileged_obs_buf = torch.clip(self.privileged_obs_buf, -clip_obs, clip_obs)
 
-        # return self.obs_buf, self.privileged_obs_buf, self.rew_buf, self.reset_buf, self.extras, termination_ids, termination_priveleged_obs
-        return self.obs_buf, self.privileged_obs_buf, self.rew_buf, self.reset_buf, self.extras, termination_ids, termination_priveleged_obs, terminal_amp_states
+        if USING_HYBRID:
+            return self.obs_buf, self.privileged_obs_buf, self.rew_buf, self.reset_buf, self.extras, termination_ids, termination_priveleged_obs, terminal_amp_states
+        else:
+            return self.obs_buf, self.privileged_obs_buf, self.rew_buf, self.reset_buf, self.extras, termination_ids, termination_priveleged_obs
 
     def post_physics_step(self):
         """

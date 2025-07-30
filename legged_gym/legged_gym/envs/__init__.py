@@ -29,15 +29,19 @@
 # Copyright (c) 2021 ETH Zurich, Nikita Rudin
 
 from legged_gym import LEGGED_GYM_ROOT_DIR, LEGGED_GYM_ENVS_DIR
-from legged_gym.envs.a1.a1_config import A1RoughCfg, A1RoughCfgPPO
+
 from .base.legged_robot import LeggedRobot
+from .base.legged_robot_config import USING_HYBRID
 from .a1.a1_config import A1RoughCfg, A1RoughCfgPPO
 from .a1.a1_stairs_config import A1StairsCfg, A1StairsCfgPPO
-from legged_gym.envs.go1.go1_config import Go1RoughCfg, Go1RoughCfgPPO
-# from legged_gym.envs.aliengo.aliengo_config import AlienGoRoughCfg, AlienGoRoughCfgPPO
-from legged_gym.envs.aliengo.aliengo_hybrid_config import AlienGoRoughCfg, AlienGoRoughCfgPPO
-from legged_gym.envs.aliengo.aliengo_stairs_config import AlienGoStairsCfg, AlienGoStairsCfgPPO
-from legged_gym.envs.aliengo.aliengo_recover_config import AlienGoRoughRecoverCfg, AlienGoRoughRecoverCfgPPO
+from .go1.go1_config import Go1RoughCfg, Go1RoughCfgPPO
+
+if USING_HYBRID:
+    from .aliengo.aliengo_amp_config import AlienGoRoughCfg, AlienGoRoughCfgPPO
+else:
+    from .aliengo.aliengo_config import AlienGoRoughCfg, AlienGoRoughCfgPPO
+from .aliengo.aliengo_stairs_config import AlienGoStairsCfg, AlienGoStairsCfgPPO
+from .aliengo.aliengo_recover_config import AlienGoRoughRecoverCfg, AlienGoRoughRecoverCfgPPO
 
 import os
 

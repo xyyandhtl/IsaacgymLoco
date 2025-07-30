@@ -31,6 +31,7 @@
 import glob
 from pathlib import Path
 
+USING_HYBRID = False
 MOTION_FILES = glob.glob(str(Path(__file__).parent.parent.parent.parent.parent / 'amp_motions/*'))
 
 from .base_config import BaseConfig

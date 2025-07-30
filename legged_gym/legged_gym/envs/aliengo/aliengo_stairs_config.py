@@ -28,8 +28,13 @@
 #
 # Copyright (c) 2021 ETH Zurich, Nikita Rudin
 from os import path as osp
-# from legged_gym.envs.aliengo.aliengo_config import AlienGoRoughCfg, AlienGoRoughCfgPPO
-from legged_gym.envs.aliengo.aliengo_hybrid_config import AlienGoRoughCfg, AlienGoRoughCfgPPO
+from legged_gym.envs.base.legged_robot_config import USING_HYBRID
+
+if USING_HYBRID:
+    from legged_gym.envs.aliengo.aliengo_amp_config import AlienGoRoughCfg, AlienGoRoughCfgPPO
+else:
+    from legged_gym.envs.aliengo.aliengo_config import AlienGoRoughCfg, AlienGoRoughCfgPPO
+
 
 class AlienGoStairsCfg( AlienGoRoughCfg ):
 
@@ -190,5 +195,5 @@ class AlienGoStairsCfgPPO( AlienGoRoughCfgPPO ):
         run_name = ''
         # load and resume
         resume = True
-        load_run = osp.join(logs_root, 'rough_aliengo', 'Jul29_14-35-18_')
+        load_run = osp.join(logs_root, 'rough_aliengo', 'Jul11_10-53-00_')
         checkpoint = -1  # -1 = last saved model
