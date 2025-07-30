@@ -544,7 +544,6 @@ class LeggedRobot(BaseTask):
             self.dof_pos_limits = torch.zeros(self.num_dof, 2, dtype=torch.float, device=self.device, requires_grad=False)  # (num_dof, 2)
             self.dof_vel_limits = torch.zeros(self.num_dof, dtype=torch.float, device=self.device, requires_grad=False)  # (num_dof,)
             self.torque_limits = torch.zeros(self.num_dof, dtype=torch.float, device=self.device, requires_grad=False)   # (num_dof,)
-
             # 遍历每个关节属性
             for i in range(len(props)):
                 # 存储原始关节限制
@@ -599,8 +598,8 @@ class LeggedRobot(BaseTask):
         if self.cfg.commands.heading_command:
             forward = quat_apply(self.base_quat, self.forward_vec)  # 当前base的前进方向（世界坐标系）(num_envs, 3)
             heading = torch.atan2(forward[:, 1], forward[:, 0])  # 当前base的前进方向的 航向角
-            # 命令的角速度 = （目标航向-当前航向）==> 裁剪到[-2, 2]
-            self.commands[:, 2] = torch.clip(0.5*wrap_to_pi(self.commands[:, 3] - heading), -2., 2.)
+            # 命令的角速度 = 0.5 * (目标航向 - 当前航向)==> 裁剪到[-2, 2]
+            self.commands[:, 2] = torch.clip(0.5 * wrap_to_pi(self.commands[:, 3] - heading), -2., 2.)
 
         # 3. 计算采样点的高度
         if self.cfg.terrain.measure_heights:

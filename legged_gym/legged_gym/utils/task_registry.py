@@ -33,6 +33,8 @@ from datetime import datetime
 from typing import Tuple
 import torch
 import numpy as np
+import json
+import shutil
 
 from rsl_rl.env import VecEnv
 from rsl_rl.runners import OnPolicyRunner, HIMOnPolicyRunner, HybridPolicyRunner
@@ -101,7 +103,7 @@ class TaskRegistry():
                             headless=args.headless)
         return env, env_cfg
 
-    def make_alg_runner(self, env, name=None, args=None, train_cfg=None, log_root="default") -> Tuple[OnPolicyRunner, LeggedRobotCfgPPO]:
+    def make_alg_runner(self, env, name=None, args=None, train_cfg=None, log_root="default", env_cfg=None, save_cfg=True) -> Tuple[OnPolicyRunner, LeggedRobotCfgPPO]:
         """ Creates the training algorithm  either from a registered namme or from the provided config file.
 
         Args:
@@ -143,15 +145,29 @@ class TaskRegistry():
         else:
             log_dir = os.path.join(log_root, datetime.now().strftime('%b%d_%H-%M-%S') + '_' + train_cfg.runner.run_name)
 
-        runner_class = eval(train_cfg.runner_class_name)
+        log_cfg_dict = dict()
         train_cfg_dict = class_to_dict(train_cfg)
+        log_cfg_dict.update(train_cfg_dict)
+        if not env_cfg is None:
+            env_cfg_dict = class_to_dict(env_cfg)
+            log_cfg_dict.update(env_cfg_dict)
+
+        runner_class = eval(train_cfg.runner_class_name)
         runner = runner_class(env, train_cfg_dict, log_dir, device=args.rl_device)
-        #save resume path before creating a new log_dir
+
+        if save_cfg:
+            os.makedirs(log_dir, exist_ok=True)
+            with open(os.path.join(log_dir, "config.json"), "w") as f:
+                json.dump(log_cfg_dict, f, indent=4)
+
+        # save resume path before creating a new log_dir
         resume = train_cfg.runner.resume
         if resume:
             # load previously trained model
             resume_path = get_load_path(log_root, load_run=train_cfg.runner.load_run, checkpoint=train_cfg.runner.checkpoint)
             print(f"[INFO] Loading model from: {resume_path}")
+            if save_cfg:
+                shutil.copyfile(resume_path, os.path.join(log_dir, os.path.basename(resume_path)))
             runner.load(resume_path)
         return runner, train_cfg
 
