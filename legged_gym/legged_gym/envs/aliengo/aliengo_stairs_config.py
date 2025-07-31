@@ -42,15 +42,15 @@ class AlienGoStairsCfg( AlienGoRoughCfg ):
     class init_state( AlienGoRoughCfg.init_state ):
         pos = [0.0, 0.0, 0.50]  # x,y,z [m]
         default_joint_angles = {  # = target angles [rad] when action = 0.0
-            'FL_hip_joint': 0.1,  # [rad]
-            'RL_hip_joint': 0.1,  # [rad]
-            'FR_hip_joint': -0.1,  # [rad]
-            'RR_hip_joint': -0.1,  # [rad]
+            'FL_hip_joint': 0.0,  # [rad]
+            'RL_hip_joint': 0.0,  # [rad]
+            'FR_hip_joint': -0.0,  # [rad]
+            'RR_hip_joint': -0.0,  # [rad]
 
             'FL_thigh_joint': 0.8,  # [rad]
-            'RL_thigh_joint': 1.0,  # [rad]
+            'RL_thigh_joint': 0.8,  # [rad]
             'FR_thigh_joint': 0.8,  # [rad]
-            'RR_thigh_joint': 1.0,  # [rad]
+            'RR_thigh_joint': 0.8,  # [rad]
 
             'FL_calf_joint': -1.5,  # [rad]
             'RL_calf_joint': -1.5,  # [rad]
@@ -90,7 +90,7 @@ class AlienGoStairsCfg( AlienGoRoughCfg ):
         max_lat_curriculum = 1.0  # y_vel 限制 [-1.0, 1.0]
         num_commands = 4 # default: lin_vel_x, lin_vel_y, ang_vel_yaw, heading (in heading mode ang_vel_yaw is recomputed from heading error)
         resampling_time = 10. # time before command are changed[s]
-        heading_command = True # if true: compute ang vel command from heading error
+        heading_command = False # if true: compute ang vel command from heading error
 
         class ranges( AlienGoRoughCfg.commands.ranges ):
             lin_vel_x = [-1.0, 1.0]  # min max [m/s]
@@ -98,9 +98,9 @@ class AlienGoStairsCfg( AlienGoRoughCfg ):
             ang_vel_yaw = [-1.0, 1.0]  # min max [rad/s]
             heading = [-math.pi, math.pi]
 
-    class domain_rand:
+    class domain_rand( AlienGoRoughCfg.domain_rand ):
         randomize_payload_mass = True
-        payload_mass_range = [0, 2]
+        payload_mass_range = [0.0, 3.0]
 
         randomize_com_displacement = True
         com_displacement_range = [-0.05, 0.05]
@@ -123,8 +123,32 @@ class AlienGoStairsCfg( AlienGoRoughCfg ):
         randomize_kd = True
         kd_range = [0.9, 1.1]
 
-        randomize_initial_joint_pos = True
-        initial_joint_pos_range = [0.5, 1.5]
+
+        base_init_pos_range = dict(
+            x=[-1.0, 1.0],
+            y=[-1.0, 1.0],
+            z=[0.0, 0.5],
+        )
+
+        base_init_rot_range = dict(
+            roll=[-0.75, 0.75],
+            pitch=[-0.75, 0.75],
+            yaw=[-0.0, 0.0],
+        )
+
+        base_init_vel_range = dict(
+            x=[-0.5, 0.5],
+            y=[-0.5, 0.5],
+            z=[-0.5, 0.5],
+            roll=[-0.5, 0.5],
+            pitch=[-0.5, 0.5],
+            yaw=[-0.5, 0.5],
+        )
+
+        dof_init_pos_ratio_range = [0.5, 1.5]
+
+        randomize_dof_vel = True
+        dof_init_vel_range = [-1.0, 1.0]
 
         disturbance = True
         disturbance_range = [-30.0, 30.0]

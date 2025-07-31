@@ -36,15 +36,15 @@ class AlienGoRoughRecoverCfg( AlienGoRoughCfg ):
     class init_state( AlienGoRoughCfg.init_state ):
         pos = [0.0, 0.0, 0.50]  # x,y,z [m]
         default_joint_angles = {  # = target angles [rad] when action = 0.0
-            'FL_hip_joint': 0.1,  # [rad]
-            'RL_hip_joint': 0.1,  # [rad]
-            'FR_hip_joint': -0.1,  # [rad]
-            'RR_hip_joint': -0.1,  # [rad]
+            'FL_hip_joint': 0.0,  # [rad]
+            'RL_hip_joint': 0.0,  # [rad]
+            'FR_hip_joint': -0.0,  # [rad]
+            'RR_hip_joint': -0.0,  # [rad]
 
             'FL_thigh_joint': 0.8,  # [rad]
-            'RL_thigh_joint': 1.0,  # [rad]
+            'RL_thigh_joint': 0.8,  # [rad]
             'FR_thigh_joint': 0.8,  # [rad]
-            'RR_thigh_joint': 1.0,  # [rad]
+            'RR_thigh_joint': 0.8,  # [rad]
 
             'FL_calf_joint': -1.5,  # [rad]
             'RL_calf_joint': -1.5,  # [rad]
@@ -79,12 +79,12 @@ class AlienGoRoughRecoverCfg( AlienGoRoughCfg ):
 
     class commands( AlienGoRoughCfg.commands ):
         curriculum = True
-        max_forward_curriculum = 2.0  # x_vel 限制 [-1.0, 1.5]
+        max_forward_curriculum = 2.0  # x_vel 限制 [-1.0, 2.0]
         max_backward_curriculum = 1.0
         max_lat_curriculum = 1.0  # y_vel 限制 [-1.0, 1.0]
         num_commands = 4 # default: lin_vel_x, lin_vel_y, ang_vel_yaw, heading (in heading mode ang_vel_yaw is recomputed from heading error)
         resampling_time = 10. # time before command are changed[s]
-        heading_command = True # if true: compute ang vel command from heading error
+        heading_command = False # if true: compute ang vel command from heading error
 
         class ranges( AlienGoRoughCfg.commands.ranges ):
             lin_vel_x = [-1.0, 1.0]  # min max [m/s]
@@ -97,43 +97,12 @@ class AlienGoRoughRecoverCfg( AlienGoRoughCfg ):
         terminate_after_contacts_on = []  # 倒地恢复需 取消base触地终止
         self_collisions = 0  # 1：禁用自身各部分之间的碰撞检测（提升性能）；0：启用
 
-    class domain_rand:
-        randomize_payload_mass = True
-        payload_mass_range = [0, 2]
-
-        randomize_com_displacement = True
-        com_displacement_range = [-0.05, 0.05]
-
-        randomize_link_mass = False
-        link_mass_range = [0.9, 1.1]
-
-        randomize_friction = True
-        friction_range = [0.2, 1.25]
-
-        randomize_restitution = False
-        restitution_range = [0., 1.0]
-
-        randomize_motor_strength = True
-        motor_strength_range = [0.9, 1.1]
-
-        randomize_kp = True
-        kp_range = [0.9, 1.1]
-
-        randomize_kd = True
-        kd_range = [0.9, 1.1]
-
-        randomize_initial_joint_pos = True
-        initial_joint_pos_range = [0.5, 1.5]
-
-        disturbance = True
-        disturbance_range = [-30.0, 30.0]
-        disturbance_interval = 8
-
-        push_robots = True
-        push_interval_s = 16
-        max_push_vel_xy = 1.
-
-        delay = True
+    class domain_rand ( AlienGoRoughCfg.domain_rand ):
+        base_init_rot_range = dict(
+            roll=[-3.14, 3.14],
+            pitch=[-3.14, 3.14],
+            yaw=[-3.14, 3.14],
+        )
 
         recover_mode = True
 
@@ -169,7 +138,7 @@ class AlienGoRoughRecoverCfg( AlienGoRoughCfg ):
             thigh_pose_up = -0.05
             calf_pose_up = -0.05
             stuck = -0.05
-            upward = 0.5  # 摔倒恢复训练时可开启
+            upward = 1.0  # 摔倒恢复训练时可开启
             has_contact = 0.3  # 摔倒恢复训练时可开启
 
         only_positive_rewards = True  # if true negative total rewards are clipped at zero (avoids early termination problems)
