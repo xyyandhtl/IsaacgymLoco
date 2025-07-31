@@ -49,15 +49,15 @@ class AlienGoRoughCfg( LeggedRobotCfg ):
         ang_vel = [0.0, 0.0, 0.0]  # x,y,z [rad/s]
         default_joint_angles = { # action = 0.0，即零动作时的目标关节角度（站立姿态）
             # 髋关节
-            'FL_hip_joint': 0.1,   # [rad]
-            'RL_hip_joint': 0.1,   # [rad]
-            'FR_hip_joint': -0.1,   # [rad]
-            'RR_hip_joint': -0.1,   # [rad]
+            'FL_hip_joint': 0.0,   # [rad]
+            'RL_hip_joint': 0.0,   # [rad]
+            'FR_hip_joint': -0.0,   # [rad]
+            'RR_hip_joint': -0.0,   # [rad]
             # 大腿关节
             'FL_thigh_joint': 0.8,   # [rad]
-            'RL_thigh_joint': 1.0,   # [rad]
+            'RL_thigh_joint': 0.8,   # [rad]
             'FR_thigh_joint': 0.8,   # [rad]
-            'RR_thigh_joint': 1.0,   # [rad]
+            'RR_thigh_joint': 0.8,   # [rad]
             # 小腿关节（负值表示伸展）
             'FL_calf_joint': -1.5,   # [rad]
             'RL_calf_joint': -1.5,   # [rad]
