@@ -79,7 +79,7 @@ class AlienGoRoughRecoverCfg( AlienGoRoughCfg ):
 
     class commands( AlienGoRoughCfg.commands ):
         curriculum = True
-        max_forward_curriculum = 2.0  # x_vel 限制 [-1.0, 1.5]
+        max_forward_curriculum = 2.0  # x_vel 限制 [-1.0, 2.0]
         max_backward_curriculum = 1.0
         max_lat_curriculum = 1.0  # y_vel 限制 [-1.0, 1.0]
         num_commands = 4 # default: lin_vel_x, lin_vel_y, ang_vel_yaw, heading (in heading mode ang_vel_yaw is recomputed from heading error)
@@ -138,7 +138,7 @@ class AlienGoRoughRecoverCfg( AlienGoRoughCfg ):
             thigh_pose_up = -0.05
             calf_pose_up = -0.05
             stuck = -0.05
-            upward = 0.5  # 摔倒恢复训练时可开启
+            upward = 1.0  # 摔倒恢复训练时可开启
             has_contact = 0.3  # 摔倒恢复训练时可开启
 
         only_positive_rewards = True  # if true negative total rewards are clipped at zero (avoids early termination problems)

@@ -141,7 +141,7 @@ class AlienGoRoughCfg( LeggedRobotCfg ):
     class domain_rand:
         # startup
         randomize_payload_mass = True  # 是否随机改变 base的质量（默认质量 ±）
-        payload_mass_range = [0, 2]
+        payload_mass_range = [0.0, 3.0]
 
         randomize_com_displacement = True  # 是否随机改变 base的质心偏移（xyz）
         com_displacement_range = [-0.05, 0.05]
@@ -237,7 +237,7 @@ class AlienGoRoughCfg( LeggedRobotCfg ):
             hip_action_magnitude = -0.0  # action 中的 髋关节hip（0,3,6,9）动作幅度 惩罚（防止 > 1.0）
             thigh_pose = -0.05
             calf_pose = -0.05
-            stuck = -0.0  # 卡住 惩罚
+            stuck = -0.01  # 卡住 惩罚
             upward = 0.0  # 重力投影向下 奖励（恢复训练时开启）
             has_contact = 0.0  # 速度<0.1时 的 四足接触力 奖励（恢复训练时开启）
 
