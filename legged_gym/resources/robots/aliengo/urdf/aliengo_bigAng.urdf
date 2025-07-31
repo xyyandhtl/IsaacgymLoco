@@ -360,7 +360,7 @@
     <child link="FR_hip"/>
     <axis xyz="1 0 0"/>
     <dynamics damping="0" friction="0"/>
-    <limit effort="44" lower="-0.873" upper="1.047" velocity="20"/>
+    <limit effort="35.278" lower="-1.2217304763960306" upper="1.2217304763960306" velocity="20"/>
   </joint>
   <joint name="FR_hip_rotor_joint" type="fixed">
     <origin rpy="0 0 0" xyz="0.139985 -0.051 0"/>
@@ -413,8 +413,7 @@
     <child link="FR_thigh"/>
     <axis xyz="0 1 0"/>
     <dynamics damping="0" friction="0"/>
-    <limit effort="44" lower="-0.524" upper="3.927" velocity="20"/>
-    <!-- <limit effort="35.278" velocity="20"/> -->
+    <limit effort="35.278" lower="-3.141592654" upper="4.71238898" velocity="20"/>
   </joint>
   <joint name="FR_thigh_rotor_joint" type="fixed">
     <origin rpy="0 0 0" xyz="0.0 -0.0298 0"/>
@@ -467,7 +466,7 @@
     <child link="FR_calf"/>
     <axis xyz="0 1 0"/>
     <dynamics damping="0" friction="0"/>
-    <limit effort="55" lower="-2.775" upper="-0.611" velocity="15.89"/>
+    <limit effort="44.4" lower="-2.775073510670984" upper="-0.6457718232379019" velocity="15.89"/>
   </joint>
   <joint name="FR_calf_rotor_joint" type="fixed">
     <origin rpy="0 0 0" xyz="0.0 0.0997 0"/>
@@ -574,7 +573,7 @@
     <child link="FL_hip"/>
     <axis xyz="1 0 0"/>
     <dynamics damping="0" friction="0"/>
-    <limit effort="44" lower="-0.873" upper="1.047" velocity="20"/>
+    <limit effort="35.278" lower="-1.2217304763960306" upper="1.2217304763960306" velocity="20"/>
   </joint>
   <joint name="FL_hip_rotor_joint" type="fixed">
     <origin rpy="0 0 0" xyz="0.139985 0.051 0"/>
@@ -627,8 +626,7 @@
     <child link="FL_thigh"/>
     <axis xyz="0 1 0"/>
     <dynamics damping="0" friction="0"/>
-    <limit effort="44" lower="-0.524" upper="3.927" velocity="20"/>
-    <!-- <limit effort="35.278" velocity="20"/> -->
+    <limit effort="35.278" lower="-3.141592654" upper="4.71238898" velocity="20"/>
   </joint>
   <joint name="FL_thigh_rotor_joint" type="fixed">
     <origin rpy="0 0 0" xyz="0.0 0.0298 0"/>
@@ -681,7 +679,7 @@
     <child link="FL_calf"/>
     <axis xyz="0 1 0"/>
     <dynamics damping="0" friction="0"/>
-    <limit effort="55" lower="-2.775" upper="-0.611" velocity="15.89"/>
+    <limit effort="44.4" lower="-2.775073510670984" upper="-0.6457718232379019" velocity="15.89"/>
   </joint>
   <joint name="FL_calf_rotor_joint" type="fixed">
     <origin rpy="0 0 0" xyz="0.0 -0.0997 0"/>
@@ -788,7 +786,7 @@
     <child link="RR_hip"/>
     <axis xyz="1 0 0"/>
     <dynamics damping="0" friction="0"/>
-    <limit effort="44" lower="-0.873" upper="1.047" velocity="20"/>
+    <limit effort="35.278" lower="-1.2217304763960306" upper="1.2217304763960306" velocity="20"/>
   </joint>
   <joint name="RR_hip_rotor_joint" type="fixed">
     <origin rpy="0 0 0" xyz="-0.139985 -0.051 0"/>
@@ -841,8 +839,7 @@
     <child link="RR_thigh"/>
     <axis xyz="0 1 0"/>
     <dynamics damping="0" friction="0"/>
-    <limit effort="44" lower="-0.524" upper="3.927" velocity="20"/>
-    <!-- <limit effort="35.278" velocity="20"/> -->
+    <limit effort="35.278" lower="-3.141592654" upper="4.71238898" velocity="20"/>
   </joint>
   <joint name="RR_thigh_rotor_joint" type="fixed">
     <origin rpy="0 0 0" xyz="0.0 -0.0298 0"/>
@@ -895,7 +892,7 @@
     <child link="RR_calf"/>
     <axis xyz="0 1 0"/>
     <dynamics damping="0" friction="0"/>
-    <limit effort="55" lower="-2.775" upper="-0.611" velocity="15.89"/>
+    <limit effort="44.4" lower="-2.775073510670984" upper="-0.6457718232379019" velocity="15.89"/>
   </joint>
   <joint name="RR_calf_rotor_joint" type="fixed">
     <origin rpy="0 0 0" xyz="0.0 0.0997 0"/>
@@ -1002,7 +999,7 @@
     <child link="RL_hip"/>
     <axis xyz="1 0 0"/>
     <dynamics damping="0" friction="0"/>
-    <limit effort="44" lower="-0.873" upper="1.047" velocity="20"/>
+    <limit effort="35.278" lower="-1.2217304763960306" upper="1.2217304763960306" velocity="20"/>
   </joint>
   <joint name="RL_hip_rotor_joint" type="fixed">
     <origin rpy="0 0 0" xyz="-0.139985 0.051 0"/>
@@ -1055,8 +1052,7 @@
     <child link="RL_thigh"/>
     <axis xyz="0 1 0"/>
     <dynamics damping="0" friction="0"/>
-    <limit effort="44" lower="-0.524" upper="3.927" velocity="20"/>
-    <!-- <limit effort="35.278" velocity="20"/> -->
+    <limit effort="35.278" lower="-3.141592654" upper="4.71238898" velocity="20"/>
   </joint>
   <joint name="RL_thigh_rotor_joint" type="fixed">
     <origin rpy="0 0 0" xyz="0.0 0.0298 0"/>
@@ -1109,7 +1105,7 @@
     <child link="RL_calf"/>
     <axis xyz="0 1 0"/>
     <dynamics damping="0" friction="0"/>
-    <limit effort="55" lower="-2.775" upper="-0.611" velocity="15.89"/>
+    <limit effort="44.4" lower="-2.775073510670984" upper="-0.6457718232379019" velocity="15.89"/>
   </joint>
   <joint name="RL_calf_rotor_joint" type="fixed">
     <origin rpy="0 0 0" xyz="0.0 -0.0997 0"/>
