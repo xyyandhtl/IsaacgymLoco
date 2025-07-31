@@ -97,43 +97,12 @@ class AlienGoRoughRecoverCfg( AlienGoRoughCfg ):
         terminate_after_contacts_on = []  # 倒地恢复需 取消base触地终止
         self_collisions = 0  # 1：禁用自身各部分之间的碰撞检测（提升性能）；0：启用
 
-    class domain_rand:
-        randomize_payload_mass = True
-        payload_mass_range = [0, 2]
-
-        randomize_com_displacement = True
-        com_displacement_range = [-0.05, 0.05]
-
-        randomize_link_mass = False
-        link_mass_range = [0.9, 1.1]
-
-        randomize_friction = True
-        friction_range = [0.2, 1.25]
-
-        randomize_restitution = False
-        restitution_range = [0., 1.0]
-
-        randomize_motor_strength = True
-        motor_strength_range = [0.9, 1.1]
-
-        randomize_kp = True
-        kp_range = [0.9, 1.1]
-
-        randomize_kd = True
-        kd_range = [0.9, 1.1]
-
-        randomize_initial_joint_pos = True
-        initial_joint_pos_range = [0.5, 1.5]
-
-        disturbance = True
-        disturbance_range = [-30.0, 30.0]
-        disturbance_interval = 8
-
-        push_robots = True
-        push_interval_s = 16
-        max_push_vel_xy = 1.
-
-        delay = True
+    class domain_rand ( AlienGoRoughCfg.domain_rand ):
+        base_init_rot_range = dict(
+            roll=[-3.14, 3.14],
+            pitch=[-3.14, 3.14],
+            yaw=[-3.14, 3.14],
+        )
 
         recover_mode = True
 

@@ -166,8 +166,32 @@ class AlienGoRoughCfg( LeggedRobotCfg ):
         randomize_kd = True  # 是否 随机改变PD控制器的D增益（damping）
         kd_range = [0.9, 1.1]
 
-        randomize_initial_joint_pos = True  # 是否随机化初始关节位置（暂时未启作用）
-        initial_joint_pos_range = [0.5, 1.5]
+        # 重置时随机改变base的 位置（默认位置 +），默认x,y方向为 [-1, 1]，z方向为 0，若更改则为下面的
+        base_init_pos_range = dict(
+            x=[-1.0, 1.0],
+            y=[-1.0, 1.0],
+            z=[0.0, 0.5],
+        )
+        # 重置时随机设置base的 方向（摔倒恢复模式都设为 [-3.14, 3.14]）
+        base_init_rot_range = dict(
+            roll=[-0.75, 0.75],
+            pitch=[-0.75, 0.75],
+            yaw=[-0.0, 0.0],
+        )
+        # 重置时随机设置base的 线速度、角速度，默认为x,y,x,rool,pitch,roll方向 [-0.5, 0.5]，若更改则为下面的
+        base_init_vel_range = dict(
+            x=[-0.5, 0.5],
+            y=[-0.5, 0.5],
+            z=[-0.5, 0.5],
+            roll=[-0.5, 0.5],
+            pitch=[-0.5, 0.5],
+            yaw=[-0.5, 0.5],
+        )
+
+        dof_init_pos_ratio_range = [0.5, 1.5]  # 重置时随机改变 关节初始位置（默认关节位置 *）
+
+        randomize_dof_vel = True  # 重置时设置 关节初始速度
+        dof_init_vel_range = [-1.0, 1.0]  # 默认为 [-1.0, 1.0]
 
         # interval
         disturbance = True  # 是否给base施加一个随机扰动力（xyz方向）

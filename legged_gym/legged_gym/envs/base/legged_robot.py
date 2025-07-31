@@ -683,8 +683,20 @@ class LeggedRobot(BaseTask):
         Args:
             env_ids (List[int]): Environemnt ids
         """
-        self.dof_pos[env_ids] = self.default_dof_pos * torch_rand_float(0.5, 1.5, (len(env_ids), self.num_dof), device=self.device)
-        self.dof_vel[env_ids] = 0.
+        if getattr(self.cfg.domain_rand, "dof_init_pos_ratio_range", None) is not None:
+            self.dof_pos[env_ids] = self.default_dof_pos * torch_rand_float(
+                self.cfg.domain_rand.dof_init_pos_ratio_range[0],
+                self.cfg.domain_rand.dof_init_pos_ratio_range[1],
+                (len(env_ids), self.num_dof),
+                device=self.device)
+        else:
+            self.dof_pos[env_ids] = self.default_dof_pos
+
+        if getattr(self.cfg.domain_rand, "randomize_dof_vel", False):
+            dof_vel_range = getattr(self.cfg.domain_rand, "init_dof_vel_range", [-1.0, 1.0])
+            self.dof_vel[env_ids] = torch.rand_like(self.dof_vel[env_ids]) * abs(dof_vel_range[1] - dof_vel_range[0]) + min(dof_vel_range)
+        else:
+            self.dof_vel[env_ids] = 0.
 
         env_ids_int32 = env_ids.to(dtype=torch.int32)
         self.gym.set_dof_state_tensor_indexed(self.sim,
@@ -718,18 +730,93 @@ class LeggedRobot(BaseTask):
         if self.custom_origins:
             self.root_states[env_ids] = self.base_init_state
             self.root_states[env_ids, :3] += self.env_origins[env_ids]
-            self.root_states[env_ids, :2] += torch_rand_float(-1., 1., (len(env_ids), 2), device=self.device) # xy position within 1m of the center
+            if hasattr(self.cfg.domain_rand, "base_init_pos_range"):
+                self.root_states[env_ids, 0:1] += torch_rand_float(
+                    *self.cfg.domain_rand.base_init_pos_range["x"],
+                    (len(env_ids), 1),
+                    device=self.device
+                )
+                self.root_states[env_ids, 1:2] += torch_rand_float(
+                    *self.cfg.domain_rand.base_init_pos_range["y"],
+                    (len(env_ids), 1),
+                    device=self.device
+                )
+                # random height
+                self.root_states[env_ids, 2:3] += torch_rand_float(
+                    *self.cfg.domain_rand.base_init_pos_range["z"],
+                    (len(env_ids), 1),
+                    device=self.device
+                )
+            else:  # 默认x,y方向为 [-1, 1], z方向为 0
+                self.root_states[env_ids, :2] += torch_rand_float(-1., 1., (len(env_ids), 2), device=self.device) # xy position within 1m of the center
         else:
             self.root_states[env_ids] = self.base_init_state
             self.root_states[env_ids, :3] += self.env_origins[env_ids]
-        # base velocities
-        self.root_states[env_ids, 7:13] = torch_rand_float(-0.5, 0.5, (len(env_ids), 6), device=self.device) # [7:10]: lin vel, [10:13]: ang vel
 
-        if self.cfg.domain_rand.recover_mode:
-            # random orientation
-            self.root_states[env_ids, 3:7] = random_quat(torch_rand_float(0, 1, (len(env_ids), 3), device=self.device))
-            # random height
-            self.root_states[env_ids, 2:3] += torch_rand_float(0, 0.1, (len(env_ids), 1), device=self.device)
+        # base rotation (roll and pitch)
+        if hasattr(self.cfg.domain_rand, "base_init_rot_range"):
+            base_roll = torch_rand_float(
+                *self.cfg.domain_rand.base_init_rot_range["roll"],
+                (len(env_ids), 1),
+                device=self.device,
+            )[:, 0]
+            base_pitch = torch_rand_float(
+                *self.cfg.domain_rand.base_init_rot_range["pitch"],
+                (len(env_ids), 1),
+                device=self.device,
+            )[:, 0]
+            base_yaw = torch_rand_float(
+                *self.cfg.domain_rand.base_init_rot_range.get("yaw", [-np.pi, np.pi]),
+                (len(env_ids), 1),
+                device=self.device,
+            )[:, 0]
+            base_quat = quat_from_euler_xyz(base_roll, base_pitch, base_yaw)
+            self.root_states[env_ids, 3:7] = base_quat
+
+        # base velocities
+        if getattr(self.cfg.domain_rand, "base_init_vel_range", None) is not None:
+            base_vel_range = self.cfg.domain_rand.base_init_vel_range
+        else:
+            base_vel_range = (-0.5, 0.5)
+        if isinstance(base_vel_range, (tuple, list)):
+            self.root_states[env_ids, 7:13] = torch_rand_float(
+                *base_vel_range,
+                (len(env_ids), 6),
+                device=self.device
+            ) # [7:10]: lin vel, [10:13]: ang vel
+        elif isinstance(base_vel_range, dict):
+            self.root_states[env_ids, 7:8] = torch_rand_float(
+                *base_vel_range["x"],
+                (len(env_ids), 1),
+                device=self.device
+            )
+            self.root_states[env_ids, 8:9] = torch_rand_float(
+                *base_vel_range["y"],
+                (len(env_ids), 1),
+                device=self.device
+            )
+            self.root_states[env_ids, 9:10] = torch_rand_float(
+                *base_vel_range["z"],
+                (len(env_ids), 1),
+                device=self.device
+            )
+            self.root_states[env_ids, 10:11] = torch_rand_float(
+                *base_vel_range["roll"],
+                (len(env_ids), 1),
+                device=self.device
+            )
+            self.root_states[env_ids, 11:12] = torch_rand_float(
+                *base_vel_range["pitch"],
+                (len(env_ids), 1),
+                device=self.device
+            )
+            self.root_states[env_ids, 12:13] = torch_rand_float(
+                *base_vel_range["yaw"],
+                (len(env_ids), 1),
+                device=self.device
+            )
+        else:
+            raise NameError(f"Unknown base_vel_range type: {type(base_vel_range)}")
 
         env_ids_int32 = env_ids.to(dtype=torch.int32)
         self.gym.set_actor_root_state_tensor_indexed(self.sim,
@@ -866,7 +953,8 @@ class LeggedRobot(BaseTask):
         # 将获取的原始张量包装成PyTorch张量
         # base的状态 (num_envs, 13)，[0:3] base的位置, [3:7] base的旋转四元数，[7:10] base的线速度，[10:13] base的角速度
         self.root_states = gymtorch.wrap_tensor(actor_root_state)
-        self.dof_state = gymtorch.wrap_tensor(dof_state_tensor)  # 关节状态
+        # 关节状态 (num_envs * num_dof, 2)
+        self.dof_state = gymtorch.wrap_tensor(dof_state_tensor)
         self.dof_pos = self.dof_state.view(self.num_envs, self.num_dof, 2)[..., 0]  # 当前 关节位置 (num_env, 12, 1)
         self.dof_vel = self.dof_state.view(self.num_envs, self.num_dof, 2)[..., 1]  # 当前 关节速度 (num_env, 12, 1)
         self.base_quat = self.root_states[:, 3:7]  # base 的旋转四元数（世界坐标系）

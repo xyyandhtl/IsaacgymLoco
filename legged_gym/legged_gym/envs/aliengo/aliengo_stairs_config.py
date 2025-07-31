@@ -98,9 +98,9 @@ class AlienGoStairsCfg( AlienGoRoughCfg ):
             ang_vel_yaw = [-1.0, 1.0]  # min max [rad/s]
             heading = [-math.pi, math.pi]
 
-    class domain_rand:
+    class domain_rand( AlienGoRoughCfg.domain_rand ):
         randomize_payload_mass = True
-        payload_mass_range = [0, 2]
+        payload_mass_range = [0.0, 3.0]
 
         randomize_com_displacement = True
         com_displacement_range = [-0.05, 0.05]
@@ -123,8 +123,32 @@ class AlienGoStairsCfg( AlienGoRoughCfg ):
         randomize_kd = True
         kd_range = [0.9, 1.1]
 
-        randomize_initial_joint_pos = True
-        initial_joint_pos_range = [0.5, 1.5]
+
+        base_init_pos_range = dict(
+            x=[-1.0, 1.0],
+            y=[-1.0, 1.0],
+            z=[0.0, 0.5],
+        )
+
+        base_init_rot_range = dict(
+            roll=[-0.75, 0.75],
+            pitch=[-0.75, 0.75],
+            yaw=[-0.0, 0.0],
+        )
+
+        base_init_vel_range = dict(
+            x=[-0.5, 0.5],
+            y=[-0.5, 0.5],
+            z=[-0.5, 0.5],
+            roll=[-0.5, 0.5],
+            pitch=[-0.5, 0.5],
+            yaw=[-0.5, 0.5],
+        )
+
+        dof_init_pos_ratio_range = [0.5, 1.5]
+
+        randomize_dof_vel = True
+        dof_init_vel_range = [-1.0, 1.0]
 
         disturbance = True
         disturbance_range = [-30.0, 30.0]
