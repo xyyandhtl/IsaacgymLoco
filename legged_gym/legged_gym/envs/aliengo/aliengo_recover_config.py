@@ -97,6 +97,9 @@ class AlienGoRoughRecoverCfg( AlienGoRoughCfg ):
         terminate_after_contacts_on = []  # 倒地恢复需 取消base触地终止
         self_collisions = 0  # 1：禁用自身各部分之间的碰撞检测（提升性能）；0：启用
 
+    class termination( AlienGoRoughCfg.termination ):
+        base_vel_violate_commands = False
+
     class domain_rand ( AlienGoRoughCfg.domain_rand ):
         base_init_rot_range = dict(
             roll=[-3.14, 3.14],

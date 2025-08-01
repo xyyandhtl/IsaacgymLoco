@@ -249,29 +249,41 @@ class LeggedRobot(BaseTask):
     def check_termination(self):
         """ Check if environments need to be reset
         """
-        # termination_counts = {}
+        termination_counts = {}
         # (1) 触发终止部位的接触力 > 1N，则需要重置 (num_envs,)
         contact_force_cond = torch.any(torch.norm(self.contact_forces[:, self.termination_contact_indices, :], dim=-1) > 1., dim=1)
         self.reset_buf = contact_force_cond
-        # termination_counts["contact_force"] = (contact_force_cond.sum().item() / self.num_envs) * 100
+        termination_counts["contact_force"] = (contact_force_cond.sum().item() / self.num_envs) * 100
+        # print(f'[legged_robot] termination_counts contact_force (%): {termination_counts["contact_force"]}]')
 
         # (2) episode步数 > 1000
         self.time_out_buf = self.episode_length_buf > self.max_episode_length # no terminal reward for time-outs
         self.reset_buf |= self.time_out_buf
-        # termination_counts["time_out"] = (self.time_out_buf.sum().item() / self.num_envs) * 100
+        termination_counts["time_out"] = (self.time_out_buf.sum().item() / self.num_envs) * 100
+        # print(f'[legged_robot] termination_counts time_out (%): {termination_counts["time_out"]}]')
 
         # (3) base速度 与 命令速度（因摔倒恢复训练，需关闭这个）
-        # vel_error = self.base_lin_vel[:, 0] - self.commands[:, 0]
-        # self.vel_violate = ((vel_error > 1.5) & (self.commands[:, 0] < 0.)) | ((vel_error < -1.5) & (self.commands[:, 0] > 0.))
-        # self.vel_violate *= (self.terrain_levels > 3)
-        # self.reset_buf |= self.vel_violate
-        # termination_counts["vel_violate"] = (self.vel_violate.sum().item() / self.num_envs) * 100
+        if hasattr(self.cfg, "termination") and getattr(self.cfg.termination, "base_vel_violate_commands", False):
+            vel_error = self.base_lin_vel[:, 0] - self.commands[:, 0]
+            self.vel_violate = ((vel_error > 2) & (self.commands[:, 0] < 0.)) | ((vel_error < -2) & (self.commands[:, 0] > 0.))
+            self.vel_violate *= (self.terrain_levels > 3)
+            self.reset_buf |= self.vel_violate
+            termination_counts["vel_violate"] = (self.vel_violate.sum().item() / self.num_envs) * 100
+            # print(f'[legged_robot] termination_counts vel_violate (%): {termination_counts["vel_violate"]}]')
 
-        # (4) base的z方向线速度 < -5 （即跌落）# 或 重力投影 为 Z轴向上（因摔倒恢复训练，需关闭这个，避免刚重置就终止了）
-        self.fall = (self.root_states[:, 9] < -5.)  #  | (self.projected_gravity[:, 2] > 0.)
-        self.reset_buf |= self.fall
-        # termination_counts["fall"] = (self.fall.sum().item() / self.num_envs) * 100
-        # print(f"[legged_robot] termination_counts (%): {termination_counts}]")
+        # (4) env走出地形的边界
+        if hasattr(self.cfg, "termination") and getattr(self.cfg.termination, "out_of_border", False):
+            out_border = self.terrain.in_terrain_range(self.root_states[:, :3], device=self.device).logical_not()
+            self.reset_buf |= out_border
+            termination_counts["out_border"] = (out_border.sum().item() / self.num_envs) * 100
+            # print(f'[legged_robot] termination_counts out_border (%): {termination_counts["out_border"]}]')
+
+        # (5) base的z方向线速度 < -5 （即跌落）# 或 重力投影 为 Z轴向上（因摔倒恢复训练，需关闭这个，避免刚重置就终止了）
+        if hasattr(self.cfg, "termination") and getattr(self.cfg.termination, "fall_down", False):
+            fall_down = (self.root_states[:, 9] < -5.)  #  | (self.projected_gravity[:, 2] > 0.)
+            self.reset_buf |= fall_down
+            termination_counts["fall_down"] = (fall_down.sum().item() / self.num_envs) * 100
+            # print(f'[legged_robot] termination_counts fall_down (%): {termination_counts["fall_down"]}]')
 
     def reset_idx(self, env_ids):
         """ Reset some environments.

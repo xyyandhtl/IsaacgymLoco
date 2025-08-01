@@ -98,6 +98,13 @@ class AlienGoStairsCfg( AlienGoRoughCfg ):
             ang_vel_yaw = [-1.0, 1.0]  # min max [rad/s]
             heading = [-math.pi, math.pi]
 
+    class termination:
+        base_vel_violate_commands = True
+
+        out_of_border = True
+
+        fall_down = True
+
     class domain_rand( AlienGoRoughCfg.domain_rand ):
         randomize_payload_mass = True
         payload_mass_range = [0.0, 3.0]
