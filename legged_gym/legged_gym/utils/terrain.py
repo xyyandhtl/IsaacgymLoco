@@ -27,7 +27,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
 # Copyright (c) 2021 ETH Zurich, Nikita Rudin
-
+import torch
 import numpy as np
 from numpy.random import choice
 from scipy import interpolate
@@ -43,8 +43,10 @@ class Terrain:
         self.type = cfg.mesh_type
         if self.type in ["none", 'plane']:
             return
-        self.env_length = cfg.terrain_length  # 8
-        self.env_width = cfg.terrain_width  # 8
+        self.env_length = cfg.terrain_length  # 8m
+        self.env_width = cfg.terrain_width  # 8m
+        self.xSize = cfg.terrain_length * cfg.num_rows  # 地形总长度 = 8 * 10
+        self.ySize = cfg.terrain_width * cfg.num_cols  # 地形总宽度 = 8 * 10
         self.proportions = [np.sum(cfg.terrain_proportions[:i + 1]) for i in range(len(cfg.terrain_proportions))]
 
         self.cfg.num_sub_terrains = cfg.num_rows * cfg.num_cols  # 子地形的个数，10 * 20
@@ -214,6 +216,15 @@ class Terrain:
         y2 = int((self.env_width/2. + 1) / terrain.horizontal_scale)
         env_origin_z = np.max(terrain.height_field_raw[x1:x2, y1:y2])*terrain.vertical_scale
         self.env_origins[i, j] = [env_origin_x, env_origin_y, env_origin_z]
+
+    def in_terrain_range(self, pos, device="cpu"):
+        """ Check if the given position still have terrain underneath. (same x/y, but z is different)
+            pos: (batch_size, 3) torch.Tensor
+        """
+        return torch.logical_and(
+            pos[..., :2] >= 0,
+            pos[..., :2] < torch.tensor([self.xSize, self.ySize], device=device),
+        ).all(dim=-1)
 
 def gap_terrain(terrain, gap_size, platform_size=1.):
     gap_size = int(gap_size / terrain.horizontal_scale)

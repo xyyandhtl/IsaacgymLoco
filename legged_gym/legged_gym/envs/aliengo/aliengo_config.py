@@ -138,6 +138,13 @@ class AlienGoRoughCfg( LeggedRobotCfg ):
         armature = 0.
         thickness = 0.01
 
+    class termination:
+        base_vel_violate_commands = True  # 是否在终止条件中考虑 当地形等级>3时，base速度 与 命令速度差异过大(超过1.5m/s)（摔倒恢复训练关闭）
+
+        out_of_border = True  # 是否在终止条件中考虑 走出边界外
+
+        fall_down = True  # 是否在终止条件中考虑 跌落(base的z方向线速度 < -5)
+
     class domain_rand:
         # startup
         randomize_payload_mass = True  # 是否随机改变 base的质量（默认质量 ±）
