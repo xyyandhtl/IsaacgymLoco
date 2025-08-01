@@ -139,7 +139,7 @@ class AlienGoRoughCfg( LeggedRobotCfg ):
         thickness = 0.01
 
     class termination:
-        base_vel_violate_commands = True  # 是否在终止条件中考虑 当地形等级>3时，base速度 与 命令速度差异过大(超过1.5m/s)（摔倒恢复训练关闭）
+        base_vel_violate_commands = False  # 是否在终止条件中考虑 当地形等级>3时，base速度 与 命令速度差异过大(超过1.5m/s)（摔倒恢复训练关闭）
 
         out_of_border = True  # 是否在终止条件中考虑 走出边界外
 
@@ -181,8 +181,8 @@ class AlienGoRoughCfg( LeggedRobotCfg ):
         )
         # 重置时随机设置base的 方向（摔倒恢复模式都设为 [-3.14, 3.14]）
         base_init_rot_range = dict(
-            roll=[-0.75, 0.75],
-            pitch=[-0.75, 0.75],
+            roll=[-0.2, 0.2],
+            pitch=[-0.2, 0.2],
             yaw=[-0.0, 0.0],
         )
         # 重置时随机设置base的 线速度、角速度，默认为x,y,x,rool,pitch,roll方向 [-0.5, 0.5]，若更改则为下面的
@@ -198,7 +198,7 @@ class AlienGoRoughCfg( LeggedRobotCfg ):
         dof_init_pos_ratio_range = [0.5, 1.5]  # 重置时随机改变 关节初始位置（默认关节位置 *）
 
         randomize_dof_vel = True  # 重置时设置 关节初始速度
-        dof_init_vel_range = [-1.0, 1.0]  # 默认为 [-1.0, 1.0]
+        dof_init_vel_range = [-0.1, 0.1]  # 默认为 0.0
 
         # interval
         disturbance = True  # 是否给base施加一个随机扰动力（xyz方向）
@@ -223,7 +223,7 @@ class AlienGoRoughCfg( LeggedRobotCfg ):
             orientation = -2.0  # base 非水平姿态 惩罚（地面不平时，可减小）
             dof_acc = -2.5e-7  # 关节加速度 惩罚（若步态抖动，可增大惩罚）
             joint_power = -2e-5  # 关节高功率 惩罚：降低能耗（需平衡运动效率，过高惩罚会导致动作迟缓）
-            base_height = -10.0  # base目标高度 惩罚
+            base_height = -8.0  # base目标高度 惩罚
             foot_clearance_base = -0.1  # 大速度下 四足距base目标距离 惩罚
             foot_clearance_base_terrain = -0.0  # 大速度下 四足离地目标高度 惩罚
             action_rate = -0.02  # action变化 惩罚

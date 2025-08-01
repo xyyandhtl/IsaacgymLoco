@@ -223,7 +223,7 @@ class Terrain:
         """
         return torch.logical_and(
             pos[..., :2] >= 0,
-            pos[..., :2] < torch.tensor([self.xSize, self.ySize], device=device),
+            pos[..., :2] < torch.tensor([self.xSize + self.cfg.border_size/2, self.ySize + self.cfg.border_size/2], device=device),
         ).all(dim=-1)
 
 def gap_terrain(terrain, gap_size, platform_size=1.):
