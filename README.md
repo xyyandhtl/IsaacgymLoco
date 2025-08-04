@@ -3,7 +3,8 @@
 - forked from: https://github.com/InternRobotics/HIMLoco
 - him paper: https://arxiv.org/abs/2404.14405
 - hinf paper: https://arxiv.org/abs/2304.08485 (code to be released)
-- amp from: https://github.com/bytedance/WMP
+- amp integrated from: https://github.com/Alescontrela/AMP_for_hardware
+- rewards integrated from: 
 
 
 ### Installation
@@ -35,7 +36,7 @@
 
 * to use amp, modify [legged_robot_config.py](legged_gym/legged_gym/envs/base/legged_robot_config.py), train scripts same with above
 ```python
-USING_HYBRID = True
+USING_AMP = True
 ```
 
 2. Play and export the latest policy:

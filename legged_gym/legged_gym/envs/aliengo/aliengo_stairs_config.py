@@ -29,9 +29,9 @@
 # Copyright (c) 2021 ETH Zurich, Nikita Rudin
 import math
 from os import path as osp
-from legged_gym.envs.base.legged_robot_config import USING_HYBRID
+from legged_gym.envs.base.legged_robot_config import USING_AMP
 
-if USING_HYBRID:
+if USING_AMP:
     from legged_gym.envs.aliengo.aliengo_amp_config import AlienGoRoughCfg, AlienGoRoughCfgPPO
 else:
     from legged_gym.envs.aliengo.aliengo_config import AlienGoRoughCfg, AlienGoRoughCfgPPO
@@ -177,7 +177,7 @@ class AlienGoStairsCfg( AlienGoRoughCfg ):
             orientation = -0.2
             dof_acc = -2.5e-7
             joint_power = -6e-5
-            base_height = -5.0
+            base_height = -0.0 if USING_AMP else -5.0
             foot_clearance_base = -0.0
             foot_clearance_base_terrain = -0.0
             action_rate = -0.01
@@ -222,10 +222,10 @@ class AlienGoStairsCfgPPO( AlienGoRoughCfgPPO ):
         max_iterations = 3000  # number of policy updates
 
         # logging
-        save_interval = 100  # check for potential saves every this many iterations
+        save_interval = 200  # check for potential saves every this many iterations
         experiment_name = 'stairs_aliengo'
         run_name = ''
         # load and resume
-        resume = True
+        # resume = True
         load_run = osp.join(logs_root, 'flat_aliengo', 'Jul23_11-53-29_init0.1')
         checkpoint = -1  # -1 = last saved model

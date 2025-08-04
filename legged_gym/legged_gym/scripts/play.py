@@ -49,7 +49,7 @@ import json
 from collections import OrderedDict
 
 from legged_gym.utils.helpers import update_class_from_dict
-from legged_gym.envs.base.legged_robot_config import USING_HYBRID
+from legged_gym.envs.base.legged_robot_config import USING_AMP
 
 
 def play(args, x_vel=1.0, y_vel=0.0, yaw_vel=0.0):
@@ -116,7 +116,7 @@ def play(args, x_vel=1.0, y_vel=0.0, yaw_vel=0.0):
         env.commands[:, 0] = x_vel
         env.commands[:, 1] = y_vel
         env.commands[:, 2] = yaw_vel
-        if USING_HYBRID:
+        if USING_AMP:
             obs, _, rews, dones, infos, _, _, _ = env.step(actions.detach())
         else:
             obs, _, rews, dones, infos, _, _ = env.step(actions.detach())
@@ -164,4 +164,4 @@ if __name__ == '__main__':
     args = get_args([
         dict(name="--load_cfg", action="store_true", default=False, help="use the config from the logdir"),
     ])
-    play(args, x_vel=2.0, y_vel=0.0, yaw_vel=0.0)
+    play(args, x_vel=1.0, y_vel=0.0, yaw_vel=0.0)

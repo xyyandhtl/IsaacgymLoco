@@ -31,10 +31,19 @@
 import glob
 from pathlib import Path
 
-USING_HYBRID = False
-MOTION_FILES = glob.glob(str(Path(__file__).parent.parent.parent.parent.parent / 'amp_motions/*'))
-
 from .base_config import BaseConfig
+
+USING_AMP = True
+MOTION_FILES_DIR = Path(__file__).parent.parent.parent.parent.parent / 'datasets'
+
+# 使用AMP_for_Hardware官方数据集
+# MOTION_FILES = glob.glob(str(PMOTION_FILES_DIR / 'official/*.txt'))
+# 使用retarget_aliengo数据集
+MOTION_FILES = glob.glob(str(MOTION_FILES_DIR / 'mocap_motions_aliengo/*.txt'))
+# 使用retarget_aliengo数据集指定步态
+# MOTION_FILES = glob.glob(str(MOTION_FILES_DIR / 'mocap_motions_aliengo/trot*.txt'))
+# MOTION_FILES.extend(glob.glob(str(MOTION_FILES_DIR / 'mocap_motions_aliengo/left*.txt')))
+# MOTION_FILES.extend(glob.glob(str(MOTION_FILES_DIR / 'mocap_motions_aliengo/right*.txt')))
 
 class LeggedRobotCfg(BaseConfig):
     class env:

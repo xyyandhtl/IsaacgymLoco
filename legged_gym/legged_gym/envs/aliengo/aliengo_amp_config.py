@@ -28,7 +28,7 @@
 #
 # Copyright (c) 2021 ETH Zurich, Nikita Rudin
 
-from legged_gym.envs.base.legged_robot_config import LeggedRobotCfg, LeggedRobotCfgPPO, MOTION_FILES
+from legged_gym.envs.base.legged_robot_config import LeggedRobotCfg, LeggedRobotCfgPPO, MOTION_FILES, USING_AMP
 
 class AlienGoRoughCfg( LeggedRobotCfg ):
     class env( LeggedRobotCfg.env ):
@@ -192,7 +192,7 @@ class AlienGoRoughCfg( LeggedRobotCfg ):
             orientation = -2.0  # base 非水平姿态 惩罚（地面不平时，可减小）
             dof_acc = -2.5e-7  # 关节加速度 惩罚（若步态抖动，可增大惩罚）
             joint_power = -2e-5  # 关节高功率 惩罚：降低能耗（需平衡运动效率，过高惩罚会导致动作迟缓）
-            base_height = -10.0  # base目标高度 惩罚
+            base_height = -0.0  # base目标高度 惩罚
             foot_clearance_base = -0.1  # 大速度下 四足距base目标距离 惩罚
             foot_clearance_base_terrain = -0.0  # 大速度下 四足离地目标高度 惩罚
             action_rate = -0.02  # action变化 惩罚
@@ -289,7 +289,7 @@ class AlienGoRoughCfgPPO( LeggedRobotCfgPPO ):
         policy_class_name = 'HIMActorCritic'
         algorithm_class_name = 'HybridPPO'
         num_steps_per_env = 100  # per iteration
-        max_iterations = 1000  # number of policy updates
+        max_iterations = 600  # number of policy updates
 
         # logging
         save_interval = 100  # check for potential saves every this many iterations

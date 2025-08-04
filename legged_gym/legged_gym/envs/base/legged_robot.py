@@ -28,10 +28,10 @@
 #
 # Copyright (c) 2021 ETH Zurich, Nikita Rudin
 
-from legged_gym import LEGGED_GYM_ROOT_DIR, envs
-from time import time
-from warnings import WarningMessage
-import numpy as np
+# from legged_gym import LEGGED_GYM_ROOT_DIR, envs
+# from time import time
+# from warnings import WarningMessage
+# import numpy as np
 import os
 
 from isaacgym.torch_utils import *
@@ -48,8 +48,8 @@ from legged_gym.utils.terrain import Terrain
 from legged_gym.utils.math import quat_apply_yaw, wrap_to_pi, torch_rand_sqrt_float
 from legged_gym.utils.helpers import class_to_dict
 from legged_gym.utils.math import random_quat
-from .legged_robot_config import LeggedRobotCfg, USING_HYBRID
-from rsl_rl.datasets.motion_loader import AMPLoader
+from .legged_robot_config import LeggedRobotCfg, USING_AMP
+# from rsl_rl.datasets.motion_loader import AMPLoader
 
 class LeggedRobot(BaseTask):
     def __init__(self, cfg: LeggedRobotCfg, sim_params, physics_engine, sim_device, headless):
@@ -116,8 +116,8 @@ class LeggedRobot(BaseTask):
         self.init_done = True
         # ------ 初始化完成 ------
 
-        if self.cfg.env.reference_state_initialization:
-            self.amp_loader = AMPLoader(motion_files=self.cfg.env.amp_motion_files, device=self.device, time_between_frames=self.dt)
+        # if self.cfg.env.reference_state_initialization:
+        #     self.amp_loader = AMPLoader(motion_files=self.cfg.env.amp_motion_files, device=self.device, time_between_frames=self.dt)
 
     def step(self, actions):
         """ Apply actions, simulate, call self.post_physics_step()
@@ -170,7 +170,7 @@ class LeggedRobot(BaseTask):
         if self.privileged_obs_buf is not None:
             self.privileged_obs_buf = torch.clip(self.privileged_obs_buf, -clip_obs, clip_obs)
 
-        if USING_HYBRID:
+        if USING_AMP:
             return self.obs_buf, self.privileged_obs_buf, self.rew_buf, self.reset_buf, self.extras, termination_ids, termination_priveleged_obs, terminal_amp_states
         else:
             return self.obs_buf, self.privileged_obs_buf, self.rew_buf, self.reset_buf, self.extras, termination_ids, termination_priveleged_obs
@@ -308,13 +308,13 @@ class LeggedRobot(BaseTask):
             self.update_command_curriculum(env_ids)
         
         # 重置关节、base状态
-        if self.cfg.env.reference_state_initialization:
-            frames = self.amp_loader.get_full_frame_batch(len(env_ids))
-            self._reset_dofs_amp(env_ids, frames)
-            self._reset_root_states_amp(env_ids, frames)
-        else:
-            self._reset_dofs(env_ids)
-            self._reset_root_states(env_ids)
+        # if self.cfg.env.reference_state_initialization:
+        #     frames = self.amp_loader.get_full_frame_batch(len(env_ids))
+        #     self._reset_dofs_amp(env_ids, frames)
+        #     self._reset_root_states_amp(env_ids, frames)
+        # else:
+        self._reset_dofs(env_ids)
+        self._reset_root_states(env_ids)
 
         # 4. 为重置的 env 重新采样 commands
         self._resample_commands(env_ids)
@@ -409,11 +409,11 @@ class LeggedRobot(BaseTask):
         base_lin_vel = self.base_lin_vel
         base_ang_vel = self.base_ang_vel
         joint_vel = self.dof_vel
-        # z_pos = self.root_states[:, 2:3]
-        # if (self.cfg.terrain.measure_heights):
-        #     z_pos = z_pos - torch.mean(self.measured_heights, dim=-1, keepdim=True)
+        z_pos = self.root_states[:, 2:3]
+        if self.cfg.terrain.measure_heights:
+            z_pos = z_pos - torch.mean(self.measured_heights, dim=-1, keepdim=True)
         # return torch.cat((joint_pos, foot_pos, base_lin_vel, base_ang_vel, joint_vel, z_pos), dim=-1)
-        return torch.cat((joint_pos, base_lin_vel, base_ang_vel, joint_vel), dim=-1)
+        return torch.cat((joint_pos, base_lin_vel, base_ang_vel, joint_vel, z_pos), dim=-1)
 
     def get_current_obs(self):
         current_obs = torch.cat((   self.commands[:, :3] * self.commands_scale,
@@ -715,22 +715,6 @@ class LeggedRobot(BaseTask):
                                               gymtorch.unwrap_tensor(self.dof_state),
                                               gymtorch.unwrap_tensor(env_ids_int32), len(env_ids_int32))
 
-    def _reset_dofs_amp(self, env_ids, frames):
-        """ Resets DOF position and velocities of selected environmments
-        Positions are randomly selected within 0.5:1.5 x default positions.
-        Velocities are set to zero.
-
-        Args:
-            env_ids (List[int]): Environemnt ids
-            frames: AMP frames to initialize motion with
-        """
-        self.dof_pos[env_ids] = AMPLoader.get_joint_pose_batch(frames)
-        self.dof_vel[env_ids] = AMPLoader.get_joint_vel_batch(frames)
-        env_ids_int32 = env_ids.to(dtype=torch.int32)
-        self.gym.set_dof_state_tensor_indexed(self.sim,
-                                              gymtorch.unwrap_tensor(self.dof_state),
-                                              gymtorch.unwrap_tensor(env_ids_int32), len(env_ids_int32))
-
     def _reset_root_states(self, env_ids):
         """ Resets ROOT states position and velocities of selected environmments
             Sets base position based on the curriculum
@@ -829,27 +813,6 @@ class LeggedRobot(BaseTask):
             )
         else:
             raise NameError(f"Unknown base_vel_range type: {type(base_vel_range)}")
-
-        env_ids_int32 = env_ids.to(dtype=torch.int32)
-        self.gym.set_actor_root_state_tensor_indexed(self.sim,
-                                                     gymtorch.unwrap_tensor(self.root_states),
-                                                     gymtorch.unwrap_tensor(env_ids_int32), len(env_ids_int32))
-
-    def _reset_root_states_amp(self, env_ids, frames):
-        """ Resets ROOT states position and velocities of selected environmments
-            Sets base position based on the curriculum
-            Selects randomized base velocities within -0.5:0.5 [m/s, rad/s]
-        Args:
-            env_ids (List[int]): Environemnt ids
-        """
-        # base position
-        root_pos = AMPLoader.get_root_pos_batch(frames)
-        root_pos[:, :2] = root_pos[:, :2] + self.env_origins[env_ids, :2]
-        self.root_states[env_ids, :3] = root_pos
-        root_orn = AMPLoader.get_root_rot_batch(frames)
-        self.root_states[env_ids, 3:7] = root_orn
-        self.root_states[env_ids, 7:10] = quat_rotate(root_orn, AMPLoader.get_linear_vel_batch(frames))
-        self.root_states[env_ids, 10:13] = quat_rotate(root_orn, AMPLoader.get_angular_vel_batch(frames))
 
         env_ids_int32 = env_ids.to(dtype=torch.int32)
         self.gym.set_actor_root_state_tensor_indexed(self.sim,

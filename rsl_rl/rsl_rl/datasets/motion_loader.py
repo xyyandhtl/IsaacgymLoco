@@ -1,23 +1,3 @@
-# coding=utf-8
-# Copyright 2020 The Google Research Authors.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
-"""Utility functions for processing motion clips."""
-
-# This file may have been modified by Bytedance Ltd. and/or its affiliates (“Bytedance's Modifications”).
-# All Bytedance's Modifications are Copyright (year) Bytedance Ltd. and/or its affiliates.
-
 import os
 import glob
 import json
@@ -46,26 +26,26 @@ class AMPLoader:
     ROOT_POS_START_IDX = 0
     ROOT_POS_END_IDX = ROOT_POS_START_IDX + POS_SIZE
 
-    ROOT_ROT_START_IDX = ROOT_POS_END_IDX
+    ROOT_ROT_START_IDX = ROOT_POS_END_IDX   # 3
     ROOT_ROT_END_IDX = ROOT_ROT_START_IDX + ROT_SIZE
 
-    JOINT_POSE_START_IDX = ROOT_ROT_END_IDX
+    JOINT_POSE_START_IDX = ROOT_ROT_END_IDX # 7
     JOINT_POSE_END_IDX = JOINT_POSE_START_IDX + JOINT_POS_SIZE
 
-    TAR_TOE_POS_LOCAL_START_IDX = JOINT_POSE_END_IDX
+    TAR_TOE_POS_LOCAL_START_IDX = JOINT_POSE_END_IDX # 19
     TAR_TOE_POS_LOCAL_END_IDX = TAR_TOE_POS_LOCAL_START_IDX + TAR_TOE_POS_LOCAL_SIZE
 
-    LINEAR_VEL_START_IDX = TAR_TOE_POS_LOCAL_END_IDX
+    LINEAR_VEL_START_IDX = TAR_TOE_POS_LOCAL_END_IDX # 31
     LINEAR_VEL_END_IDX = LINEAR_VEL_START_IDX + LINEAR_VEL_SIZE
 
-    ANGULAR_VEL_START_IDX = LINEAR_VEL_END_IDX
+    ANGULAR_VEL_START_IDX = LINEAR_VEL_END_IDX  # 34
     ANGULAR_VEL_END_IDX = ANGULAR_VEL_START_IDX + ANGULAR_VEL_SIZE
 
-    JOINT_VEL_START_IDX = ANGULAR_VEL_END_IDX
+    JOINT_VEL_START_IDX = ANGULAR_VEL_END_IDX   # 37
     JOINT_VEL_END_IDX = JOINT_VEL_START_IDX + JOINT_VEL_SIZE
 
-    TAR_TOE_VEL_LOCAL_START_IDX = JOINT_VEL_END_IDX
-    TAR_TOE_VEL_LOCAL_END_IDX = TAR_TOE_VEL_LOCAL_START_IDX + TAR_TOE_VEL_LOCAL_SIZE
+    TAR_TOE_VEL_LOCAL_START_IDX = JOINT_VEL_END_IDX # 49
+    TAR_TOE_VEL_LOCAL_END_IDX = TAR_TOE_VEL_LOCAL_START_IDX + TAR_TOE_VEL_LOCAL_SIZE    # 61
 
     def __init__(
             self,
@@ -99,13 +79,13 @@ class AMPLoader:
                 motion_json = json.load(f)
                 motion_data = np.array(motion_json["Frames"])
                 #reorder is needed only if using the real animal's data
-                # motion_data = self.reorder_from_pybullet_to_isaac(motion_data)
+                motion_data = self.reorder_from_pybullet_to_isaac(motion_data)
 
                 # Normalize and standardize quaternions.
                 for f_i in range(motion_data.shape[0]):
                     root_rot = AMPLoader.get_root_rot(motion_data[f_i])
-                    # root_rot = pose3d.QuaternionNormalize(root_rot)
-                    # root_rot = motion_util.standardize_quaternion(root_rot)
+                    root_rot = pose3d.QuaternionNormalize(root_rot)
+                    root_rot = motion_util.standardize_quaternion(root_rot)
                     motion_data[
                         f_i,
                         AMPLoader.POS_SIZE:
@@ -334,19 +314,18 @@ class AMPLoader:
 
     def feed_forward_generator(self, num_mini_batch, mini_batch_size):
         """Generates a batch of AMP transitions."""
-        # remove z, foot_pos
         for _ in range(num_mini_batch):
             if self.preload_transitions:
                 idxs = np.random.choice(
                     self.preloaded_s.shape[0], size=mini_batch_size)
-                s = self.preloaded_s[idxs, AMPLoader.JOINT_POSE_START_IDX:AMPLoader.JOINT_POSE_END_IDX]
                 s = torch.cat([
-                    s,
-                    self.preloaded_s[idxs, AMPLoader.LINEAR_VEL_START_IDX:AMPLoader.JOINT_VEL_END_IDX]], dim=-1)
-                s_next = self.preloaded_s_next[idxs, AMPLoader.JOINT_POSE_START_IDX:AMPLoader.JOINT_POSE_END_IDX]
+                    self.preloaded_s[idxs, AMPLoader.JOINT_POSE_START_IDX:AMPLoader.JOINT_POSE_END_IDX],
+                    self.preloaded_s[idxs, AMPLoader.LINEAR_VEL_START_IDX:AMPLoader.JOINT_VEL_END_IDX],
+                    self.preloaded_s[idxs, AMPLoader.ROOT_POS_START_IDX + 2:AMPLoader.ROOT_POS_START_IDX + 3]], dim=-1)
                 s_next = torch.cat([
-                    s_next,
-                    self.preloaded_s_next[idxs, AMPLoader.LINEAR_VEL_START_IDX:AMPLoader.JOINT_VEL_END_IDX]], dim=-1)
+                    self.preloaded_s_next[idxs, AMPLoader.JOINT_POSE_START_IDX:AMPLoader.JOINT_POSE_END_IDX],
+                    self.preloaded_s_next[idxs, AMPLoader.LINEAR_VEL_START_IDX:AMPLoader.JOINT_VEL_END_IDX],
+                    self.preloaded_s_next[idxs, AMPLoader.ROOT_POS_START_IDX + 2:AMPLoader.ROOT_POS_START_IDX + 3]], dim=-1)
             else:
                 s, s_next = [], []
                 traj_idxs = self.weighted_traj_idx_sample_batch(mini_batch_size)
@@ -364,7 +343,7 @@ class AMPLoader:
     @property
     def observation_dim(self):
         """Size of AMP observations."""
-        return self.trajectories[0].shape[1] - 12
+        return self.trajectories[0].shape[1] + 1 - 12
 
     @property
     def num_motions(self):

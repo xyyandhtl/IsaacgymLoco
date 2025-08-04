@@ -51,7 +51,6 @@ class HybridPPO:
                  lam=0.95,
                  value_loss_coef=1.0,
                  entropy_coef=0.0,  # 0.01
-                 # vel_predict_coef=1.0,
                  learning_rate=1e-3,
                  max_grad_norm=1.0,
                  use_clipped_value_loss=True,
