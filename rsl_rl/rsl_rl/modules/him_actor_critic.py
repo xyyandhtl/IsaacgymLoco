@@ -36,6 +36,9 @@ from torch.distributions import Normal
 from .actor_critic import ActorCritic, get_activation
 from rsl_rl.modules.him_estimator import HIMEstimator
 
+# from rsl_rl.utils.visualize_latent import LatentVisualizerBatch
+# latent_visualizer = LatentVisualizerBatch()
+
 
 class HIMActorCritic(nn.Module):
     is_recurrent = False
@@ -152,6 +155,7 @@ class HIMActorCritic(nn.Module):
         vel, latent = self.estimator(obs_history)
         actor_input = torch.cat((obs_history[:, :self.num_one_step_obs], vel, latent), dim=-1)
         mean = self.actor(actor_input)
+        # latent_visualizer.update(latent)
         return mean
 
     def evaluate(self, critic_observations, **kwargs):
