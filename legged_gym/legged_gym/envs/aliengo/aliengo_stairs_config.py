@@ -90,7 +90,7 @@ class AlienGoStairsCfg( AlienGoRoughCfg ):
         max_lat_curriculum = 1.0  # y_vel 限制 [-1.0, 1.0]
         num_commands = 4 # default: lin_vel_x, lin_vel_y, ang_vel_yaw, heading (in heading mode ang_vel_yaw is recomputed from heading error)
         resampling_time = 10. # time before command are changed[s]
-        heading_command = False # if true: compute ang vel command from heading error
+        heading_command = True # if true: compute ang vel command from heading error
 
         class ranges( AlienGoRoughCfg.commands.ranges ):
             lin_vel_x = [-1.0, 1.0]  # min max [m/s]
@@ -177,7 +177,7 @@ class AlienGoStairsCfg( AlienGoRoughCfg ):
             orientation = -0.2
             dof_acc = -2.5e-7
             joint_power = -6e-5
-            base_height = -0.0 if USING_AMP else -5.0
+            base_height = -5.0  # -0.0 if USING_AMP else -5.0
             foot_clearance_base = -0.0
             foot_clearance_base_terrain = -0.0
             action_rate = -0.01
@@ -227,5 +227,5 @@ class AlienGoStairsCfgPPO( AlienGoRoughCfgPPO ):
         run_name = ''
         # load and resume
         # resume = True
-        load_run = osp.join(logs_root, 'flat_aliengo', 'Jul23_11-53-29_init0.1')
+        load_run = osp.join(logs_root, 'flat_aliengo', 'with_amp')
         checkpoint = -1  # -1 = last saved model

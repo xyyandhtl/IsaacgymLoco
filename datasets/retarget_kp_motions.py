@@ -38,7 +38,8 @@ FORWARD_DIR = np.array([1, 0, 0])
 GROUND_URDF_FILENAME = "plane_implicit.urdf"
 
 # reference motion
-FRAME_DURATION = 0.01677
+# FRAME_DURATION = 0.01677
+FRAME_DURATION = 0.02
 REF_COORD_ROT = transformations.quaternion_from_euler(0.5 * np.pi, 0, 0)
 REF_POS_OFFSET = np.array([0, 0, 0])
 REF_ROOT_ROT = transformations.quaternion_from_euler(0, 0, 0.47 * np.pi)

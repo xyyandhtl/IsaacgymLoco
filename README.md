@@ -3,7 +3,7 @@
 - forked from: https://github.com/InternRobotics/HIMLoco
 - him paper: https://arxiv.org/abs/2404.14405
 - hinf paper: https://arxiv.org/abs/2304.08485 (code to be released)
-- amp integrated from: https://github.com/Alescontrela/AMP_for_hardware
+- amp integrated from: https://github.com/Alescontrela/AMP_for_hardware.git
 - rewards integrated from: 
 
 
