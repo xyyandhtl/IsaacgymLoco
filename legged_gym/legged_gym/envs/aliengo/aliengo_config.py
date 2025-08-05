@@ -106,7 +106,7 @@ class AlienGoRoughCfg( LeggedRobotCfg ):
         max_lat_curriculum = 1.0  # y_vel 限制 [-1.0, 1.0]
         num_commands = 4 # default: lin_vel_x, lin_vel_y, ang_vel_yaw, heading (in heading mode ang_vel_yaw is recomputed from heading error)
         resampling_time = 10. # time before command are changed[s]
-        heading_command = False # if true: compute ang vel command from heading error
+        heading_command = True # if true: compute ang vel command from heading error
 
         class ranges( LeggedRobotCfg.commands.ranges ):
             lin_vel_x = [-1.0, 1.0]  # min max [m/s]
@@ -139,7 +139,7 @@ class AlienGoRoughCfg( LeggedRobotCfg ):
         thickness = 0.01
 
     class termination:
-        base_vel_violate_commands = False  # 是否在终止条件中考虑 当地形等级>3时，base速度 与 命令速度差异过大(超过1.5m/s)（摔倒恢复训练关闭）
+        base_vel_violate_commands = False  # 是否在终止条件中考虑 当地形等级>3时，base速度 与 命令速度差异过大(超过2m/s)（摔倒恢复训练关闭）
 
         out_of_border = True  # 是否在终止条件中考虑 走出边界外
 
@@ -173,11 +173,11 @@ class AlienGoRoughCfg( LeggedRobotCfg ):
         randomize_kd = True  # 是否 随机改变PD控制器的D增益（damping）
         kd_range = [0.9, 1.1]
 
-        # 重置时随机改变base的 位置（默认位置 +），默认x,y方向为 [-1, 1]，z方向为 0，若更改则为下面的
+        # 重置时随机改变base的 位置（初始位置 +），默认x,y方向为 [-1, 1]，z方向为 0，若更改则为下面的
         base_init_pos_range = dict(
             x=[-1.0, 1.0],
             y=[-1.0, 1.0],
-            z=[0.0, 0.5],
+            z=[0.0, 0.05],
         )
         # 重置时随机设置base的 方向（摔倒恢复模式都设为 [-3.14, 3.14]）
         base_init_rot_range = dict(
@@ -185,7 +185,7 @@ class AlienGoRoughCfg( LeggedRobotCfg ):
             pitch=[-0.2, 0.2],
             yaw=[-0.0, 0.0],
         )
-        # 重置时随机设置base的 线速度、角速度，默认为x,y,x,rool,pitch,roll方向 [-0.5, 0.5]，若更改则为下面的
+        # 重置时随机设置base的 线速度、角速度，默认x,y,x,rool,pitch,roll方向为 [-0.5, 0.5]，若更改则为下面的
         base_init_vel_range = dict(
             x=[-0.5, 0.5],
             y=[-0.5, 0.5],
@@ -195,7 +195,7 @@ class AlienGoRoughCfg( LeggedRobotCfg ):
             yaw=[-0.5, 0.5],
         )
 
-        dof_init_pos_ratio_range = [0.5, 1.5]  # 重置时随机改变 关节初始位置（默认关节位置 *）
+        dof_init_pos_ratio_range = [0.5, 1.5]  # 重置时随机改变 关节初始位置（初始关节位置 *），默认为 [0.5, 1.5]
 
         randomize_dof_vel = True  # 重置时设置 关节初始速度
         dof_init_vel_range = [-0.1, 0.1]  # 默认为 0.0
