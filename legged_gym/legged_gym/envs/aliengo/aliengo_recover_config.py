@@ -111,38 +111,45 @@ class AlienGoRoughRecoverCfg( AlienGoRoughCfg ):
 
     class rewards( AlienGoRoughCfg.rewards ):
         class scales:
+            # general
             termination = -0.0
+            # velocity-tracking
             tracking_lin_vel = 2.0
             tracking_ang_vel = 1.0
+            # root
             lin_vel_z_up = -2.0
             ang_vel_xy_up = -0.05
             orientation_up = -2.0  # base 非水平姿态 惩罚
-            dof_acc = -2.5e-7
-            joint_power = -2e-5
             base_height_up = -5.0
-            foot_clearance_base_up = -0.1
-            foot_clearance_base_terrain = -0.0
-            action_rate = -0.02
-            smoothness = -0.01
-            feet_air_time = 0.25
-            feet_mirror_up = -0.05
-            collision_up = -0.0
-            feet_stumble_up = -0.0
-            feet_slide_up = -0.01
-            feet_contact_forces = -0.00015
-            stand_nice = -0.1    # commands 速度接近0（<0.1 m/s）且 重力投影向下时 的 关节位置与默认关节位置的 偏差 惩罚
+            # joint
             torques = -0.0002
-            dof_vel = -0.0
-            dof_pos_limits = -0.0
-            dof_vel_limits = -0.0
             torque_limits = -0.0
+            dof_vel = -0.0
+            dof_acc = -2.5e-7
+            stand_nice = -0.1    # commands 速度接近0（<0.1 m/s）且 重力投影向下时 的 关节位置与默认关节位置的 偏差 惩罚
             hip_pos_up = -0.3
-            hip_action_magnitude = -0.01
             thigh_pose_up = -0.05
             calf_pose_up = -0.05
+            dof_pos_limits = -0.0
+            dof_vel_limits = -0.0
+            joint_power = -2e-5
+            feet_mirror_up = -0.05
+            # action
+            action_rate = -0.02
+            smoothness = -0.01
+            hip_action_magnitude = -0.01
+            # contact
+            collision_up = -0.0
+            feet_contact_forces = -0.00015
+            # others
+            feet_air_time = 0.25
+            has_contact = 0.3  # 摔倒恢复训练时可开启
+            feet_stumble_up = -0.0
+            feet_slide_up = -0.01
+            foot_clearance_base_up = -0.1
+            foot_clearance_base_terrain = -0.0
             stuck = -0.05
             upward = 1.0  # 摔倒恢复训练时可开启
-            has_contact = 0.3  # 摔倒恢复训练时可开启
 
         only_positive_rewards = True  # if true negative total rewards are clipped at zero (avoids early termination problems)
         tracking_sigma = 0.25  # tracking reward = exp(-error^2/sigma)

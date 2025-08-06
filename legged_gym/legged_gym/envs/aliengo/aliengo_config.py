@@ -215,38 +215,45 @@ class AlienGoRoughCfg( LeggedRobotCfg ):
 
     class rewards( LeggedRobotCfg.rewards ):
         class scales:
+            # general
             termination = -0.0  # 仿真终止时的惩罚：未启用。设为负值（如-10.0）可在跌倒时给予额外惩罚
+            # velocity-tracking
             tracking_lin_vel = 1.5  # commands 中XY方向的 线速度跟踪 奖励，主导前进/后退训练
             tracking_ang_vel = 1.5  # commands 中yaw方向的 角速度跟踪 奖励
+            # root
             lin_vel_z = -2.0  # base 的 Z 轴线速度 惩罚：防止机身跳跃
             ang_vel_xy = -0.05  # base 的 XY 轴角速度 惩罚：抑制机身翻滚（roll, pitch）
             orientation = -2.0  # base 非水平姿态 惩罚（地面不平时，可减小）
-            dof_acc = -2.5e-7  # 关节加速度 惩罚（若步态抖动，可增大惩罚）
-            joint_power = -2e-5  # 关节高功率 惩罚：降低能耗（需平衡运动效率，过高惩罚会导致动作迟缓）
-            base_height = -8.0  # base目标高度 惩罚
-            foot_clearance_base = -0.1  # 大速度下 四足距base目标距离 惩罚
-            foot_clearance_base_terrain = -0.0  # 大速度下 四足离地目标高度 惩罚
-            action_rate = -0.02  # action变化 惩罚
-            smoothness = -0.01  # action二阶平滑性 惩罚（复杂地形，可适当降低）
-            feet_air_time = 0.25  # 四足的空中时间接近0.5s 奖励
-            feet_mirror = -0.05  # 斜对称腿的关节位置偏差 惩罚
-            collision = -0.0  # 指定关节的碰撞 惩罚。检测超过 max_contact_force (100N) 的接触，设为负值（如-0.1）可防硬件过载
-            feet_stumble = -0.0  # 四足接触到垂直表面 惩罚
-            feet_slide = -0.01  # 脚接触地面具有相对base的速度 惩罚
-            feet_contact_forces = -0.00015  # 四足的接触力 > 100N 惩罚
-            stand_still = -0.1    # commands 速度接近0（<0.1 m/s）的 关节位置与默认关节位置的 偏差 惩罚
+            base_height = -8.0  # base 目标高度 惩罚
+            # joint
             torques = -0.0002  # 关节扭矩过大 惩罚
-            dof_vel = -0.0  # 关节速度过大 惩罚
-            dof_pos_limits = -0.0  # 关节位置接近极限 惩罚
-            dof_vel_limits = -0.0  # 关节速度接近极限 惩罚
             torque_limits = -0.0  # 关节扭矩接近极限 惩罚
+            dof_vel = -0.0  # 关节速度过大 惩罚
+            dof_acc = -2.5e-7  # 关节加速度 惩罚（若步态抖动，可增大惩罚）
+            stand_still = -0.1  # commands 速度接近0（<0.1 m/s）的 关节位置与默认关节位置的 偏差 惩罚
             hip_pos = -0.2  # 髋关节hip（0,3,6,9）位置与默认位置的偏差 惩罚
-            hip_action_magnitude = -0.0  # action 中的 髋关节hip（0,3,6,9）动作幅度 惩罚（防止 > 1.0）
             thigh_pose = -0.05
             calf_pose = -0.05
-            stuck = -0.01  # 卡住 惩罚
+            dof_pos_limits = -0.0  # 关节位置接近极限 惩罚
+            dof_vel_limits = -0.0  # 关节速度接近极限 惩罚
+            joint_power = -2e-5  # 关节高功率 惩罚：降低能耗（需平衡运动效率，过高惩罚会导致动作迟缓）
+            feet_mirror = -0.05  # 斜对称腿的关节位置偏差 惩罚
+            # action
+            action_rate = -0.02  # action变化 惩罚
+            smoothness = -0.01  # action二阶平滑性 惩罚（复杂地形，可适当降低）
+            hip_action_magnitude = -0.0  # action 中的 髋关节hip（0,3,6,9）动作幅度 惩罚（防止 > 1.0）
+            # contact
+            collision = -0.0  # 指定关节的碰撞 惩罚。检测超过 max_contact_force (100N) 的接触，设为负值（如-0.1）可防硬件过载
+            feet_contact_forces = -0.00015  # 四足的接触力 > 100N 惩罚
+            # others
+            feet_air_time = 0.25  # 四足的空中时间接近0.5s 奖励
+            has_contact = 0.0  # 速度<0.1时 的 四足触地个数 奖励（恢复训练时开启）
+            feet_stumble = -0.0  # 四足接触到垂直表面 惩罚
+            feet_slide = -0.01  # 脚接触地面具有相对base的速度 惩罚
+            foot_clearance_base = -0.1  # 大速度下 四足距base目标距离 惩罚
+            foot_clearance_base_terrain = -0.0  # 大速度下 四足离地目标高度 惩罚
+            stuck = -0.01  # base 卡住 惩罚
             upward = 0.0  # 重力投影向下 奖励（恢复训练时开启）
-            has_contact = 0.0  # 速度<0.1时 的 四足接触力 奖励（恢复训练时开启）
 
         reward_curriculum = False
         reward_curriculum_term = ["feet_edge"]

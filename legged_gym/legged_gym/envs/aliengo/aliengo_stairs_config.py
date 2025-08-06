@@ -79,7 +79,7 @@ class AlienGoStairsCfg( AlienGoRoughCfg ):
         num_rows = 10  # number of terrain rows (levels)
         num_cols = 20  # number of terrain cols (types)
         # terrain types: [flat, rough, smooth_slope, rough_slope, stairs_up, stairs_down, discrete_obstacles, stepping_stones, pit, gap]
-        terrain_proportions = [0.0, 0.0, 0.1, 0.0, 0.4, 0.3, 0.2, 0.0, 0.0, 0.0]
+        terrain_proportions = [0.0, 0.0, 0.1, 0.1, 0.3, 0.3, 0.2, 0.0, 0.0, 0.0]
         # trimesh only:
         slope_treshold = 0.75  # slopes above this threshold will be corrected to vertical surfaces
 
@@ -134,12 +134,12 @@ class AlienGoStairsCfg( AlienGoRoughCfg ):
         base_init_pos_range = dict(
             x=[-1.0, 1.0],
             y=[-1.0, 1.0],
-            z=[0.0, 0.5],
+            z=[0.0, 0.05],
         )
 
         base_init_rot_range = dict(
-            roll=[-0.75, 0.75],
-            pitch=[-0.75, 0.75],
+            roll=[-0.2, 0.2],
+            pitch=[-0.2, 0.2],
             yaw=[-0.0, 0.0],
         )
 
@@ -155,7 +155,7 @@ class AlienGoStairsCfg( AlienGoRoughCfg ):
         dof_init_pos_ratio_range = [0.5, 1.5]
 
         randomize_dof_vel = True
-        dof_init_vel_range = [-1.0, 1.0]
+        dof_init_vel_range = [-0.1, 0.1]
 
         disturbance = True
         disturbance_range = [-30.0, 30.0]
@@ -169,37 +169,45 @@ class AlienGoStairsCfg( AlienGoRoughCfg ):
 
     class rewards( AlienGoRoughCfg.rewards ):
         class scales:
+            # general
             termination = -50.
+            # velocity-tracking
             tracking_lin_vel = 1.5
             tracking_ang_vel = 0.75
+            # root
             lin_vel_z = -2.0
             ang_vel_xy = -0.05
             orientation = -0.2
-            dof_acc = -2.5e-7
-            joint_power = -6e-5
             base_height = -5.0  # -0.0 if USING_AMP else -5.0
-            foot_clearance_base = -0.0
-            foot_clearance_base_terrain = -0.0
-            action_rate = -0.01
-            smoothness = -0.0
-            feet_air_time = 0.1
-            feet_mirror = -0.0
-            collision = -3.0
-            feet_stumble = -1.0
-            feet_slide = -0.01
-            feet_contact_forces = -0.00015
-            stand_still = -0.01
+            # joint
             torques = -0.0002
-            dof_vel = -0.0
-            dof_pos_limits = -0.0
-            dof_vel_limits = -0.0
             torque_limits = -0.0
+            dof_vel = -0.0
+            dof_acc = -2.5e-7
+            stand_still = -0.01
             hip_pos = -0.2
             thigh_pose = -0.1
             calf_pose = -0.1
+            dof_pos_limits = -0.0
+            dof_vel_limits = -0.0
+            joint_power = -6e-5
+            feet_mirror = -0.0
+            # action
+            action_rate = -0.01
+            smoothness = -0.0
+            hip_action_magnitude = -0.0
+            # contact
+            collision = -3.0
+            feet_contact_forces = -0.00015
+            # others
+            feet_air_time = 0.1
+            has_contact = 0.0
+            feet_stumble = -1.0
+            feet_slide = -0.01
+            foot_clearance_base = -0.0
+            foot_clearance_base_terrain = -0.0
             stuck = -1.
             upward = 0.0
-            has_contact = 0.0
 
         only_positive_rewards = False  # if true negative total rewards are clipped at zero (avoids early termination problems)
         tracking_sigma = 0.25  # tracking reward = exp(-error^2/sigma)
@@ -207,7 +215,7 @@ class AlienGoStairsCfg( AlienGoRoughCfg ):
         soft_dof_vel_limit = 0.95
         soft_torque_limit = 0.95
         base_height_target = 0.43
-        foot_height_target_base = -0.25
+        foot_height_target_base = -0.27
         foot_height_target_terrain = 0.15
         max_contact_force = 100.  # forces above this value are penalized
 
@@ -226,6 +234,6 @@ class AlienGoStairsCfgPPO( AlienGoRoughCfgPPO ):
         experiment_name = 'stairs_aliengo'
         run_name = ''
         # load and resume
-        # resume = True
-        load_run = osp.join(logs_root, 'flat_aliengo', 'amp_0805')
+        resume = True
+        load_run = osp.join(logs_root, 'flat_aliengo', 'Aug05_16-03-01_init_Heading_baseHeight')
         checkpoint = -1  # -1 = last saved model
