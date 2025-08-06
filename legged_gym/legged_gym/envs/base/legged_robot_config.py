@@ -28,7 +28,6 @@
 #
 # Copyright (c) 2021 ETH Zurich, Nikita Rudin
 
-import glob
 from pathlib import Path
 
 from .base_config import BaseConfig
@@ -42,9 +41,9 @@ MOTION_FILES_DIR = Path(__file__).parent.parent.parent.parent.parent / 'datasets
 # 使用retarget_aliengo数据集
 # MOTION_FILES = glob.glob(str(MOTION_FILES_DIR / 'mocap_motions_aliengo/*.txt'))
 # 使用retarget_aliengo数据集指定步态
-MOTION_FILES = glob.glob(str(MOTION_FILES_DIR / 'mocap_motions_aliengo/trot*.txt'))
-MOTION_FILES.extend(glob.glob(str(MOTION_FILES_DIR / 'mocap_motions_aliengo/left*.txt')))
-MOTION_FILES.extend(glob.glob(str(MOTION_FILES_DIR / 'mocap_motions_aliengo/right*.txt')))
+# MOTION_FILES = glob.glob(str(MOTION_FILES_DIR / 'mocap_motions_aliengo/trot*.txt'))
+# MOTION_FILES.extend(glob.glob(str(MOTION_FILES_DIR / 'mocap_motions_aliengo/left*.txt')))
+# MOTION_FILES.extend(glob.glob(str(MOTION_FILES_DIR / 'mocap_motions_aliengo/right*.txt')))
 
 class LeggedRobotCfg(BaseConfig):
     class env:
@@ -86,7 +85,7 @@ class LeggedRobotCfg(BaseConfig):
 
     class commands:
         curriculum = True
-        max_curriculum = 3.0
+        max_forward_curriculum = 2.0
         num_commands = 4 # default: lin_vel_x, lin_vel_y, ang_vel_yaw, heading (in heading mode ang_vel_yaw is recomputed from heading error)
         resampling_time = 10. # time before command are changed[s]
         heading_command = True # if true: compute ang vel command from heading error

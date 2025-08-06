@@ -28,11 +28,13 @@
 #
 # Copyright (c) 2021 ETH Zurich, Nikita Rudin
 import math
+import glob
+from legged_gym.envs.base.legged_robot_config import LeggedRobotCfg, LeggedRobotCfgPPO, MOTION_FILES_DIR, TRAIN_RUNNING
 
-from legged_gym.envs.base.legged_robot_config import LeggedRobotCfg, LeggedRobotCfgPPO, MOTION_FILES, MOTION_FILES_DIR, TRAIN_RUNNING
-
+MOTION_FILES = glob.glob(str(MOTION_FILES_DIR / 'mocap_motions_aliengo/trot*.txt'))
+MOTION_FILES.extend(glob.glob(str(MOTION_FILES_DIR / 'mocap_motions_aliengo/left*.txt')))
+MOTION_FILES.extend(glob.glob(str(MOTION_FILES_DIR / 'mocap_motions_aliengo/right*.txt')))
 if TRAIN_RUNNING:
-    import glob
     MOTION_FILES.extend(glob.glob(str(MOTION_FILES_DIR / 'mocap_motions_aliengo/pace*.txt')))
     MOTION_FILES.extend(glob.glob(str(MOTION_FILES_DIR / 'mocap_motions_aliengo/canter*.txt')))
 
@@ -115,7 +117,7 @@ class AlienGoRoughCfg( LeggedRobotCfg ):
         heading_command = True # if true: compute ang vel command from heading error
 
         class ranges( LeggedRobotCfg.commands.ranges ):
-            lin_vel_x = [-1.0, 1.0]  # min max [m/s]
+            lin_vel_x = [-2.0, 2.0] if TRAIN_RUNNING else [-1.0, 1.0]  # min max [m/s]
             lin_vel_y = [-0.5, 0.5]  # min max [m/s]
             ang_vel_yaw = [-1.0, 1.0]  # min max [rad/s]
             heading = [-math.pi, math.pi]
@@ -319,7 +321,7 @@ class AlienGoRoughCfgPPO( LeggedRobotCfgPPO ):
         policy_class_name = 'HIMActorCritic'
         algorithm_class_name = 'HybridPPO'
         num_steps_per_env = 100  # per iteration
-        max_iterations = 1500  # number of policy updates
+        max_iterations = 3000 if TRAIN_RUNNING else 1000  # number of policy updates
 
         # logging
         save_interval = 100  # check for potential saves every this many iterations

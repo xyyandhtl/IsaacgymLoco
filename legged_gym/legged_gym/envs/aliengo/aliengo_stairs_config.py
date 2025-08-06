@@ -219,13 +219,13 @@ class AlienGoStairsCfgPPO( AlienGoRoughCfgPPO ):
         policy_class_name = 'HIMActorCritic'
         # algorithm_class_name = 'HybridPPO'
         num_steps_per_env = 100  # per iteration
-        max_iterations = 3000  # number of policy updates
+        max_iterations = 4000  # number of policy updates
 
         # logging
         save_interval = 200  # check for potential saves every this many iterations
         experiment_name = 'stairs_aliengo'
         run_name = ''
         # load and resume
-        resume = True
+        # resume = True
         load_run = osp.join(logs_root, 'flat_aliengo', 'amp_0805')
         checkpoint = -1  # -1 = last saved model

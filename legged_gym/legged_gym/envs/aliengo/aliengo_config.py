@@ -28,7 +28,7 @@
 #
 # Copyright (c) 2021 ETH Zurich, Nikita Rudin
 import math
-from legged_gym.envs.base.legged_robot_config import LeggedRobotCfg, LeggedRobotCfgPPO, MOTION_FILES
+from legged_gym.envs.base.legged_robot_config import LeggedRobotCfg, LeggedRobotCfgPPO
 
 class AlienGoRoughCfg( LeggedRobotCfg ):
     class env( LeggedRobotCfg.env ):
@@ -328,11 +328,3 @@ class AlienGoRoughCfgPPO( LeggedRobotCfgPPO ):
         resume = False
         load_run = -1  # -1 = last run
         checkpoint = -1  # -1 = last saved model
-
-        amp_reward_coef = 0.5 * 0.02  # set to 0 means not use amp reward
-        amp_motion_files = MOTION_FILES
-        amp_num_preload_transitions = 2000000
-        amp_task_reward_lerp = 0.3
-        amp_discr_hidden_dims = [1024, 512]
-
-        min_normalized_std = [0.05, 0.02, 0.05] * 4
