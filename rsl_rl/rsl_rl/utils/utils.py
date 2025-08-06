@@ -62,9 +62,8 @@ def split_and_pad_trajectories(tensor, dones):
     trajectory_lengths = done_indices[1:] - done_indices[:-1]
     trajectory_lengths_list = trajectory_lengths.tolist()
     # Extract the individual trajectories
-    trajectories = torch.split(tensor.transpose(1, 0).flatten(0, 1),trajectory_lengths_list)
+    trajectories = torch.split(tensor.transpose(1, 0).flatten(0, 1), trajectory_lengths_list)
     padded_trajectories = torch.nn.utils.rnn.pad_sequence(trajectories)
-
 
     trajectory_masks = trajectory_lengths > torch.arange(0, tensor.shape[0], device=tensor.device).unsqueeze(1)
     return padded_trajectories, trajectory_masks
@@ -134,7 +133,7 @@ class Normalizer(RunningMeanStd):
         policy_data_generator = rollouts.feed_forward_generator_amp(
             None, mini_batch_size=expert_loader.batch_size)
         expert_data_generator = expert_loader.dataset.feed_forward_generator_amp(
-                expert_loader.batch_size)
+            expert_loader.batch_size)
 
         for expert_batch, policy_batch in zip(expert_data_generator, policy_data_generator):
             self.update(

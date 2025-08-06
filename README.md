@@ -3,7 +3,8 @@
 - forked from: https://github.com/InternRobotics/HIMLoco
 - him paper: https://arxiv.org/abs/2404.14405
 - hinf paper: https://arxiv.org/abs/2304.08485 (code to be released)
-- amp from: https://github.com/bytedance/WMP
+- amp integrated from: https://github.com/Alescontrela/AMP_for_hardware.git
+- rewards integrated from: 
 
 
 ### Installation
@@ -35,9 +36,12 @@
 
 * to use amp, modify [legged_robot_config.py](legged_gym/legged_gym/envs/base/legged_robot_config.py), train scripts same with above
 ```python
-USING_HYBRID = True
+USING_AMP = True
 ```
 
 2. Play and export the latest policy:
    - `python legged_gym/legged_gym/scripts/play.py --task aliengo --load_run <run_name> --load_cfg`
    - `python legged_gym/legged_gym/scripts/play.py --task aliengo_stairs --load_run <run_name> --load_cfg`
+   - train 2-stage with USING_AMP and play with ramdom vel_x from -2.0 to 2.0, yaw from -1.0 to 1.0:
+   - ![amp_2stage.gif](projects/assets/amp_2stage.gif)
+   - some pretrained weights [link](https://drive.google.com/drive/folders/1BSknmyXVngnZQTRyra1fTVmoVvp5cZWq?usp=sharing)

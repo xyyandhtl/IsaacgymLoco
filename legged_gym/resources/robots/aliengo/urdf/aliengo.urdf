@@ -347,12 +347,12 @@
       </geometry>
       <material name="red"/>
     </visual>
-    <collision>
+    <!-- <collision>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
         <box size=".001 .001 .001"/>
       </geometry>
-    </collision>
+    </collision> -->
   </link>
   <joint name="FR_hip_joint" type="revolute">
     <origin rpy="0 0 0" xyz="0.2407 -0.051 0"/>

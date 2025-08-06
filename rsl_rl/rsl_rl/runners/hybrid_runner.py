@@ -46,15 +46,10 @@ from rsl_rl.utils.utils import Normalizer
 # from rsl_rl.modules import DepthPredictor
 import torch.optim as optim
 
-# from dreamer.models import *
 import ruamel.yaml as yaml
 import argparse
 import pathlib
 import sys
-# import collections
-# from dreamer import tools
-# import datetime
-# import uuid
 
 class HybridPolicyRunner:
 
@@ -62,9 +57,7 @@ class HybridPolicyRunner:
                  env: VecEnv,
                  train_cfg,
                  log_dir=None,
-                 device='cpu',
-                 # history_length=5,
-                 ):
+                 device='cpu'):
 
         self.cfg = train_cfg["runner"]
         self.alg_cfg = train_cfg["algorithm"]
@@ -165,37 +158,6 @@ class HybridPolicyRunner:
         cur_episode_length = torch.zeros(self.env.num_envs, dtype=torch.float, device=self.device)
 
         tot_iter = self.current_learning_iteration + num_learning_iterations
-
-        # process trajectory history
-        # self.trajectory_history = torch.zeros(size=(self.env.num_envs, self.history_length, self.env.num_obs -
-        #                                             self.env.privileged_dim - self.env.height_dim - 3),
-        #                                       device=self.device)
-        # obs_without_command = torch.concat((obs[:, self.env.privileged_dim:self.env.privileged_dim + 6],
-        #                                     obs[:, self.env.privileged_dim + 9:-self.env.height_dim]), dim=1)
-        # self.trajectory_history = torch.concat((self.trajectory_history[:, 1:], obs_without_command.unsqueeze(1)),
-        #                                        dim=1)
-
-        # init world model input
-        # sum_wm_dataset_size = 0
-        # wm_latent = wm_action = None
-        # wm_is_first = torch.ones(self.env.num_envs, device=self._world_model.device)
-        # wm_obs = {
-        #     "prop": obs[:, self.env.privileged_dim: self.env.privileged_dim + self.env.cfg.env.prop_dim].to(self._world_model.device),
-        #     "is_first": wm_is_first,
-        # }
-        #
-        # if(self.env.cfg.depth.use_camera):
-        #     wm_obs["image"] = torch.zeros(((self.env.num_envs,) + self.env.cfg.depth.resized + (1,)), device=self._world_model.device)
-        #
-        # wm_metrics = None
-        # self.wm_update_interval = self.env.cfg.depth.update_interval
-        # wm_action_history = torch.zeros(size=(self.env.num_envs, self.wm_update_interval, self.env.num_actions),
-        #                                 device=self._world_model.device)
-        # wm_reward = torch.zeros(self.env.num_envs, device=self._world_model.device)
-        # wm_feature = torch.zeros((self.env.num_envs, self.wm_feature_dim))
-        #
-        # self.init_wm_dataset()
-
         for it in range(self.current_learning_iteration, tot_iter):
             if self.env.cfg.rewards.reward_curriculum:
                 self.env.update_reward_curriculum(it)

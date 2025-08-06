@@ -27,8 +27,16 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
 # Copyright (c) 2021 ETH Zurich, Nikita Rudin
+import math
+import glob
+from legged_gym.envs.base.legged_robot_config import LeggedRobotCfg, LeggedRobotCfgPPO, MOTION_FILES_DIR, TRAIN_RUNNING
 
-from legged_gym.envs.base.legged_robot_config import LeggedRobotCfg, LeggedRobotCfgPPO, MOTION_FILES
+MOTION_FILES = glob.glob(str(MOTION_FILES_DIR / 'mocap_motions_aliengo/trot*.txt'))
+MOTION_FILES.extend(glob.glob(str(MOTION_FILES_DIR / 'mocap_motions_aliengo/left*.txt')))
+MOTION_FILES.extend(glob.glob(str(MOTION_FILES_DIR / 'mocap_motions_aliengo/right*.txt')))
+if TRAIN_RUNNING:
+    MOTION_FILES.extend(glob.glob(str(MOTION_FILES_DIR / 'mocap_motions_aliengo/pace*.txt')))
+    MOTION_FILES.extend(glob.glob(str(MOTION_FILES_DIR / 'mocap_motions_aliengo/canter*.txt')))
 
 class AlienGoRoughCfg( LeggedRobotCfg ):
     class env( LeggedRobotCfg.env ):
@@ -49,15 +57,15 @@ class AlienGoRoughCfg( LeggedRobotCfg ):
         ang_vel = [0.0, 0.0, 0.0]  # x,y,z [rad/s]
         default_joint_angles = { # action = 0.0，即零动作时的目标关节角度（站立姿态）
             # 髋关节
-            'FL_hip_joint': 0.1,   # [rad]
-            'RL_hip_joint': 0.1,   # [rad]
-            'FR_hip_joint': -0.1,   # [rad]
-            'RR_hip_joint': -0.1,   # [rad]
+            'FL_hip_joint': 0.0,   # [rad]
+            'RL_hip_joint': 0.0,   # [rad]
+            'FR_hip_joint': -0.0,   # [rad]
+            'RR_hip_joint': -0.0,   # [rad]
             # 大腿关节
             'FL_thigh_joint': 0.8,   # [rad]
-            'RL_thigh_joint': 1.0,   # [rad]
+            'RL_thigh_joint': 0.8,   # [rad]
             'FR_thigh_joint': 0.8,   # [rad]
-            'RR_thigh_joint': 1.0,   # [rad]
+            'RR_thigh_joint': 0.8,   # [rad]
             # 小腿关节（负值表示伸展）
             'FL_calf_joint': -1.5,   # [rad]
             'RL_calf_joint': -1.5,   # [rad]
@@ -101,7 +109,7 @@ class AlienGoRoughCfg( LeggedRobotCfg ):
 
     class commands( LeggedRobotCfg.commands ):
         curriculum = True
-        max_forward_curriculum = 1.5
+        max_forward_curriculum = 3.0 if TRAIN_RUNNING else 2.0
         max_backward_curriculum = 1.0
         max_lat_curriculum = 1.0
         num_commands = 4 # default: lin_vel_x, lin_vel_y, ang_vel_yaw, heading (in heading mode ang_vel_yaw is recomputed from heading error)
@@ -109,10 +117,10 @@ class AlienGoRoughCfg( LeggedRobotCfg ):
         heading_command = True # if true: compute ang vel command from heading error
 
         class ranges( LeggedRobotCfg.commands.ranges ):
-            lin_vel_x = [-1.0, 1.0]  # min max [m/s]
+            lin_vel_x = [-2.0, 2.0] if TRAIN_RUNNING else [-1.0, 1.0]  # min max [m/s]
             lin_vel_y = [-0.5, 0.5]  # min max [m/s]
             ang_vel_yaw = [-1.0, 1.0]  # min max [rad/s]
-            heading = [-1.0, 1.0]
+            heading = [-math.pi, math.pi]
 
     class asset( LeggedRobotCfg.asset ):
         file = '{LEGGED_GYM_ROOT_DIR}/resources/robots/aliengo/urdf/aliengo.urdf'
@@ -141,7 +149,7 @@ class AlienGoRoughCfg( LeggedRobotCfg ):
     class domain_rand:
         # startup
         randomize_payload_mass = True  # 是否随机改变 base的质量（默认质量 ±）
-        payload_mass_range = [-1, 2]
+        payload_mass_range = [0.0, 3.0]
 
         randomize_com_displacement = True  # 是否随机改变 base的质心偏移（xyz）
         com_displacement_range = [-0.05, 0.05]
@@ -157,7 +165,7 @@ class AlienGoRoughCfg( LeggedRobotCfg ):
         restitution_range = [0., 1.0]
 
         # reset
-        randomize_motor_strength = True  # 是否随机化env的电机强度（好像也暂时未启作用）
+        randomize_motor_strength = True  # 是否随机化env的电机强度（输出的actions *）
         motor_strength_range = [0.9, 1.1]
 
         randomize_kp = True  # 是否 随机改变PD控制器的p增益（stiffness）
@@ -166,8 +174,32 @@ class AlienGoRoughCfg( LeggedRobotCfg ):
         randomize_kd = True  # 是否 随机改变PD控制器的D增益（damping）
         kd_range = [0.9, 1.1]
 
-        randomize_initial_joint_pos = True  # 是否随机化初始关节位置（暂时未启作用）
-        initial_joint_pos_range = [0.5, 1.5]
+        # 重置时随机改变base的 位置（默认位置 +），默认x,y方向为 [-1, 1]，z方向为 0，若更改则为下面的
+        base_init_pos_range = dict(
+            x=[-1.0, 1.0],
+            y=[-1.0, 1.0],
+            z=[0.0, 0.5],
+        )
+        # 重置时随机设置base的 方向（摔倒恢复模式都设为 [-3.14, 3.14]）
+        base_init_rot_range = dict(
+            roll=[-0.75, 0.75],
+            pitch=[-0.75, 0.75],
+            yaw=[-0.0, 0.0],
+        )
+        # 重置时随机设置base的 线速度、角速度，默认为x,y,x,rool,pitch,roll方向 [-0.5, 0.5]，若更改则为下面的
+        base_init_vel_range = dict(
+            x=[-0.5, 0.5],
+            y=[-0.5, 0.5],
+            z=[-0.5, 0.5],
+            roll=[-0.5, 0.5],
+            pitch=[-0.5, 0.5],
+            yaw=[-0.5, 0.5],
+        )
+
+        dof_init_pos_ratio_range = [0.5, 1.5]  # 重置时随机改变 关节初始位置（默认关节位置 *）
+
+        randomize_dof_vel = True  # 重置时设置 关节初始速度
+        dof_init_vel_range = [-1.0, 1.0]  # 默认为 [-1.0, 1.0]
 
         # interval
         disturbance = True  # 是否给base施加一个随机扰动力（xyz方向）
@@ -213,7 +245,7 @@ class AlienGoRoughCfg( LeggedRobotCfg ):
             hip_action_magnitude = -0.0  # action 中的 髋关节hip（0,3,6,9）动作幅度 惩罚（防止 > 1.0）
             thigh_pose = -0.05
             calf_pose = -0.05
-            stuck = -0.0  # 卡住 惩罚
+            stuck = -0.01  # 卡住 惩罚
             upward = 0.0  # 重力投影向下 奖励（恢复训练时开启）
             has_contact = 0.0  # 速度<0.1时 的 四足接触力 奖励（恢复训练时开启）
 
@@ -226,7 +258,7 @@ class AlienGoRoughCfg( LeggedRobotCfg ):
         soft_dof_pos_limit = 0.95   # 关节位置软限位：关节角度超过URDF限位95%时触发惩罚。调低（如0.9）可提前约束
         soft_dof_vel_limit = 0.95   # 关节速度软限位：超过最大速度95%时惩罚。保护电机模型不过载
         soft_torque_limit = 0.95    # 关节力矩软限位：超过额定扭矩95%时惩罚。防止仿真数值发散
-        base_height_target = 0.43   # 机身目标高度（低于初始高度0.55m）
+        base_height_target = 0.43   # 机身目标高度
         foot_height_target_base = -0.27  # 足部距base的 相对距离目标（抬脚高度为0.15 以适应台阶地形）
         foot_height_target_terrain = 0.15  # 足部离地高度目标
         max_contact_force = 100.    # 四足接触力 > 100N 时触发惩罚的阈值
@@ -289,7 +321,7 @@ class AlienGoRoughCfgPPO( LeggedRobotCfgPPO ):
         policy_class_name = 'HIMActorCritic'
         algorithm_class_name = 'HybridPPO'
         num_steps_per_env = 100  # per iteration
-        max_iterations = 1000  # number of policy updates
+        max_iterations = 3000 if TRAIN_RUNNING else 1000  # number of policy updates
 
         # logging
         save_interval = 100  # check for potential saves every this many iterations

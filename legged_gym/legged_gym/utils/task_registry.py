@@ -168,7 +168,7 @@ class TaskRegistry():
             print(f"[INFO] Loading model from: {resume_path}")
             if save_cfg:
                 shutil.copyfile(resume_path, os.path.join(log_dir, os.path.basename(resume_path)))
-            runner.load(resume_path)
+            runner.load(resume_path)    # , load_optimizer=False
         return runner, train_cfg
 
 # make global task registry
