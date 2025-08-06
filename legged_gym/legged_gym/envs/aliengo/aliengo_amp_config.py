@@ -178,12 +178,12 @@ class AlienGoRoughCfg( LeggedRobotCfg ):
         base_init_pos_range = dict(
             x=[-1.0, 1.0],
             y=[-1.0, 1.0],
-            z=[0.0, 0.5],
+            z=[0.0, 0.05],
         )
         # 重置时随机设置base的 方向（摔倒恢复模式都设为 [-3.14, 3.14]）
         base_init_rot_range = dict(
-            roll=[-0.75, 0.75],
-            pitch=[-0.75, 0.75],
+            roll=[-0.2, 0.2],
+            pitch=[-0.2, 0.2],
             yaw=[-0.0, 0.0],
         )
         # 重置时随机设置base的 线速度、角速度，默认为x,y,x,rool,pitch,roll方向 [-0.5, 0.5]，若更改则为下面的
@@ -253,7 +253,7 @@ class AlienGoRoughCfg( LeggedRobotCfg ):
             feet_slide = -0.01  # 脚接触地面具有相对base的速度 惩罚
             foot_clearance_base = -0.1  # 大速度下 四足距base目标距离 惩罚
             foot_clearance_base_terrain = -0.0  # 大速度下 四足离地目标高度 惩罚
-            stuck = -0.0  # base 卡住 惩罚
+            stuck = -0.01  # base 卡住 惩罚
             upward = 0.0  # 重力投影向下 奖励（恢复训练时开启）
 
         reward_curriculum = False
