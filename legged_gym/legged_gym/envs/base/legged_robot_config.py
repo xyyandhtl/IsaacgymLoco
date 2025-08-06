@@ -34,7 +34,7 @@ from pathlib import Path
 from .base_config import BaseConfig
 
 TRAIN_RUNNING = False
-USING_AMP = True
+USING_AMP = False
 MOTION_FILES_DIR = Path(__file__).parent.parent.parent.parent.parent / 'datasets'
 
 # 使用AMP_for_Hardware官方数据集

@@ -319,7 +319,7 @@ class AlienGoRoughCfgPPO( LeggedRobotCfgPPO ):
         policy_class_name = 'HIMActorCritic'
         algorithm_class_name = 'HybridPPO'
         num_steps_per_env = 100  # per iteration
-        max_iterations = 1000  # number of policy updates
+        max_iterations = 1500  # number of policy updates
 
         # logging
         save_interval = 100  # check for potential saves every this many iterations

@@ -80,6 +80,8 @@ def play(args, x_vel=1.0, y_vel=0.0, yaw_vel=0.0):
     # env_cfg.terrain.mesh_type = 'plane'
     env_cfg.asset.terminate_after_contacts_on = []
     env_cfg.commands.heading_command = False
+    env_cfg.commands.curriculum = False
+    env_cfg.commands.resampling_time = 10000.0
 
     # prepare environment
     env, _ = task_registry.make_env(name=args.task, args=args, env_cfg=env_cfg)
@@ -114,16 +116,17 @@ def play(args, x_vel=1.0, y_vel=0.0, yaw_vel=0.0):
     img_idx = 0
     env.set_camera(camera_position, lookat_position)
 
-    env.commands[:, 0] = 2 * x_vel * torch.rand(env.num_envs, device=env.device) - x_vel  # x_vel
-    env.commands[:, 1] = 2 * y_vel * torch.rand(env.num_envs, device=env.device) - y_vel  # y_vel
-    env.commands[:, 2] = 2 * yaw_vel * torch.rand(env.num_envs, device=env.device) - yaw_vel  # yaw_vel
+    # use random vel for each env
+    x_vel = 2 * x_vel * torch.rand(env.num_envs, device=env.device) - x_vel  # x_vel
+    y_vel = 2 * y_vel * torch.rand(env.num_envs, device=env.device) - y_vel  # y_vel
+    yaw_vel = 2 * yaw_vel * torch.rand(env.num_envs, device=env.device) - yaw_vel  # yaw_vel
 
-    for i in range(1 * int(env.max_episode_length)):
+    for i in range(10 * int(env.max_episode_length)):
     
         actions = policy(obs.detach())
-        # env.commands[:, 0] = x_vel
-        # env.commands[:, 1] = y_vel
-        # env.commands[:, 2] = yaw_vel
+        env.commands[:, 0] = x_vel
+        env.commands[:, 1] = y_vel
+        env.commands[:, 2] = yaw_vel
         obs, _, rews, dones, infos, * _ = env.step(actions.detach())
 
         if RECORD_FRAMES:
