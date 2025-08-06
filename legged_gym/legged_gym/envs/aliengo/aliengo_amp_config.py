@@ -28,7 +28,13 @@
 #
 # Copyright (c) 2021 ETH Zurich, Nikita Rudin
 import math
-from legged_gym.envs.base.legged_robot_config import LeggedRobotCfg, LeggedRobotCfgPPO, MOTION_FILES, USING_AMP
+
+from legged_gym.envs.base.legged_robot_config import LeggedRobotCfg, LeggedRobotCfgPPO, MOTION_FILES, MOTION_FILES_DIR, TRAIN_RUNNING
+
+if TRAIN_RUNNING:
+    import glob
+    MOTION_FILES.extend(glob.glob(str(MOTION_FILES_DIR / 'mocap_motions_aliengo/pace*.txt')))
+    MOTION_FILES.extend(glob.glob(str(MOTION_FILES_DIR / 'mocap_motions_aliengo/canter*.txt')))
 
 class AlienGoRoughCfg( LeggedRobotCfg ):
     class env( LeggedRobotCfg.env ):
@@ -101,7 +107,7 @@ class AlienGoRoughCfg( LeggedRobotCfg ):
 
     class commands( LeggedRobotCfg.commands ):
         curriculum = True
-        max_forward_curriculum = 2.0
+        max_forward_curriculum = 3.0 if TRAIN_RUNNING else 2.0
         max_backward_curriculum = 1.0
         max_lat_curriculum = 1.0
         num_commands = 4 # default: lin_vel_x, lin_vel_y, ang_vel_yaw, heading (in heading mode ang_vel_yaw is recomputed from heading error)
@@ -216,7 +222,7 @@ class AlienGoRoughCfg( LeggedRobotCfg ):
             orientation = -2.0  # base 非水平姿态 惩罚（地面不平时，可减小）
             dof_acc = -2.5e-7  # 关节加速度 惩罚（若步态抖动，可增大惩罚）
             joint_power = -2e-5  # 关节高功率 惩罚：降低能耗（需平衡运动效率，过高惩罚会导致动作迟缓）
-            base_height = -10.0  # -10.0  # base目标高度 惩罚
+            base_height = -10.0  # base目标高度 惩罚
             foot_clearance_base = -0.1  # 大速度下 四足距base目标距离 惩罚
             foot_clearance_base_terrain = -0.0  # 大速度下 四足离地目标高度 惩罚
             action_rate = -0.02  # action变化 惩罚

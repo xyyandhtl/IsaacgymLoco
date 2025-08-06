@@ -226,6 +226,6 @@ class AlienGoStairsCfgPPO( AlienGoRoughCfgPPO ):
         experiment_name = 'stairs_aliengo'
         run_name = ''
         # load and resume
-        # resume = True
-        load_run = osp.join(logs_root, 'flat_aliengo', 'with_amp')
+        resume = True
+        load_run = osp.join(logs_root, 'flat_aliengo', 'amp_0805')
         checkpoint = -1  # -1 = last saved model

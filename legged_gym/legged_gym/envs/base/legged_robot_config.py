@@ -33,6 +33,7 @@ from pathlib import Path
 
 from .base_config import BaseConfig
 
+TRAIN_RUNNING = False
 USING_AMP = True
 MOTION_FILES_DIR = Path(__file__).parent.parent.parent.parent.parent / 'datasets'
 

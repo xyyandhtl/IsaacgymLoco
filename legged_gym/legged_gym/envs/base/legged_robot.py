@@ -409,11 +409,11 @@ class LeggedRobot(BaseTask):
         base_lin_vel = self.base_lin_vel
         base_ang_vel = self.base_ang_vel
         joint_vel = self.dof_vel
-        z_pos = self.root_states[:, 2:3]
-        if self.cfg.terrain.measure_heights:
-            z_pos = z_pos - torch.mean(self.measured_heights, dim=-1, keepdim=True)
+        # z_pos = self.root_states[:, 2:3]
+        # if self.cfg.terrain.measure_heights:
+        #     z_pos = z_pos - torch.mean(self.measured_heights, dim=-1, keepdim=True)
         # return torch.cat((joint_pos, foot_pos, base_lin_vel, base_ang_vel, joint_vel, z_pos), dim=-1)
-        return torch.cat((joint_pos, base_lin_vel, base_ang_vel, joint_vel, z_pos), dim=-1)
+        return torch.cat((joint_pos, base_lin_vel, base_ang_vel, joint_vel), dim=-1)
 
     def get_current_obs(self):
         current_obs = torch.cat((   self.commands[:, :3] * self.commands_scale,

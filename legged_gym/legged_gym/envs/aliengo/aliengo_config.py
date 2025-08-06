@@ -314,8 +314,6 @@ class AlienGoRoughCfgPPO( LeggedRobotCfgPPO ):
         desired_kl = 0.01
         max_grad_norm = 1.
 
-        # amp_replay_buffer_size = 1000000
-
     class runner( LeggedRobotCfgPPO.runner ):
         policy_class_name = 'HIMActorCritic'
         algorithm_class_name = 'HIMPPO'

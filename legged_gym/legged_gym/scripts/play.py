@@ -43,6 +43,7 @@ from isaacgym import gymapi
 from legged_gym.envs import *
 from legged_gym.utils import  get_args, export_policy_as_jit, task_registry, Logger
 
+import imageio
 import numpy as np
 import torch
 import json
@@ -78,6 +79,7 @@ def play(args, x_vel=1.0, y_vel=0.0, yaw_vel=0.0):
     # env_cfg.commands.heading_command = False
     # env_cfg.terrain.mesh_type = 'plane'
     env_cfg.asset.terminate_after_contacts_on = []
+    env_cfg.commands.heading_command = False
 
     # prepare environment
     env, _ = task_registry.make_env(name=args.task, args=args, env_cfg=env_cfg)
@@ -104,23 +106,29 @@ def play(args, x_vel=1.0, y_vel=0.0, yaw_vel=0.0):
     stop_state_log = 100 # number of steps before plotting states
     stop_rew_log = env.max_episode_length + 1 # number of steps before print average episode rewards
     # camera_position = np.array(env_cfg.viewer.pos, dtype=np.float64)
-    camera_position = np.array([-5, 0, 6], dtype=np.float64)
+    camera_position = np.array([3, 3, 3], dtype=np.float64)
+    lookat_position = np.array([10, 10, 0], dtype=np.float64)
     camera_vel = np.array([1., 1., 0.])
     # camera_direction = np.array(env_cfg.viewer.lookat) - np.array(env_cfg.viewer.pos)
     camera_direction = np.array([25, 0, 3]) - np.array(env_cfg.viewer.pos)
     img_idx = 0
+    env.set_camera(camera_position, lookat_position)
 
-    for i in range(10 * int(env.max_episode_length)):
+    env.commands[:, 0] = 2 * x_vel * torch.rand(env.num_envs, device=env.device) - x_vel  # x_vel
+    env.commands[:, 1] = 2 * y_vel * torch.rand(env.num_envs, device=env.device) - y_vel  # y_vel
+    env.commands[:, 2] = 2 * yaw_vel * torch.rand(env.num_envs, device=env.device) - yaw_vel  # yaw_vel
+
+    for i in range(1 * int(env.max_episode_length)):
     
         actions = policy(obs.detach())
-        env.commands[:, 0] = x_vel
-        env.commands[:, 1] = y_vel
-        env.commands[:, 2] = yaw_vel
+        # env.commands[:, 0] = x_vel
+        # env.commands[:, 1] = y_vel
+        # env.commands[:, 2] = yaw_vel
         obs, _, rews, dones, infos, * _ = env.step(actions.detach())
 
         if RECORD_FRAMES:
             if i % 2:
-                filename = os.path.join(LEGGED_GYM_ROOT_DIR, 'logs', train_cfg.runner.experiment_name, train_cfg.runner.load_run, 'exported', f"{img_idx}.png")
+                filename = os.path.join(LEGGED_GYM_ROOT_DIR, 'logs', train_cfg.runner.experiment_name, train_cfg.runner.load_run, 'exported', f"{img_idx:04d}.png")
                 env.gym.write_viewer_image_to_file(env.viewer, filename)
                 img_idx += 1 
         if MOVE_CAMERA:
@@ -154,6 +162,15 @@ def play(args, x_vel=1.0, y_vel=0.0, yaw_vel=0.0):
         elif i==stop_rew_log:
             logger.print_rewards()
 
+    if RECORD_FRAMES:
+        image_dir = str(os.path.join(LEGGED_GYM_ROOT_DIR, 'logs', train_cfg.runner.experiment_name, train_cfg.runner.load_run, 'exported'))
+        output_file = os.path.join(image_dir, 'video.mp4')
+        images = [os.path.join(image_dir, img) for img in os.listdir(image_dir) if img.endswith(".png")]
+        images = sorted(images)
+        frames = [imageio.imread(img) for img in images]
+        imageio.mimsave(output_file, frames, fps=25)    # fps = 1 / 0.02 / 2
+        print(f"✅ 视频保存完成: {output_file}")
+
 if __name__ == '__main__':
     EXPORT_POLICY = True
     RECORD_FRAMES = False
@@ -161,4 +178,4 @@ if __name__ == '__main__':
     args = get_args([
         dict(name="--load_cfg", action="store_true", default=False, help="use the config from the logdir"),
     ])
-    play(args, x_vel=2.0, y_vel=0.0, yaw_vel=0.0)
+    play(args, x_vel=2.0, y_vel=0.0, yaw_vel=1.0)   # if use randomly vel, check line 124-126 and 131-133
