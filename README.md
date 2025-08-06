@@ -42,3 +42,6 @@ USING_AMP = True
 2. Play and export the latest policy:
    - `python legged_gym/legged_gym/scripts/play.py --task aliengo --load_run <run_name> --load_cfg`
    - `python legged_gym/legged_gym/scripts/play.py --task aliengo_stairs --load_run <run_name> --load_cfg`
+   - train 2-stage with USING_AMP and play with ramdom vel_x from -2.0 to 2.0, yaw from -1.0 to 1.0:
+   - ![amp_2stage.gif](projects/assets/amp_2stage.gif)
+   - some pretrained weights [link](https://drive.google.com/drive/folders/1BSknmyXVngnZQTRyra1fTVmoVvp5cZWq?usp=sharing)
